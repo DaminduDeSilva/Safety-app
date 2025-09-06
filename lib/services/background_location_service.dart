@@ -132,7 +132,7 @@ class BackgroundLocationService {
       'latitude': position.latitude,
       'longitude': position.longitude,
       'accuracy': position.accuracy,
-      'timestamp': position.timestamp?.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch,
+      'timestamp': position.timestamp.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch,
       'source': 'foreground',
     });
   }
