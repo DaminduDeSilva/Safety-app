@@ -6,8 +6,10 @@ import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../services/location_service.dart';
 import 'contacts_screen.dart';
-import 'live_location_screen_safe.dart';
-import 'guardian_dashboard_safe_screen.dart';
+import 'live_location_screen.dart'; // Updated to use Google Maps version
+import 'guardian_dashboard_screen.dart'; // Updated to use Google Maps version
+import 'report_unsafe_zone_screen.dart'; // New map-based unsafe zone reporting
+import 'emergency_sos_screen.dart'; // New map-based emergency SOS
 import 'live_location_test_screen.dart';
 
 /// Main dashboard screen for authenticated users.
@@ -31,7 +33,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   );
 
   bool _isSOSLoading = false;
-  bool _isReportingUnsafe = false;
+  final bool _isReportingUnsafe = false;
 
   @override
   void initState() {
@@ -216,6 +218,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   /// Handles the SOS emergency button press
   Future<void> _handleSOSEmergency() async {
+    // Navigate to the Emergency SOS screen for enhanced visual feedback
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const EmergencySOSScreen(),
+      ),
+    );
+
     setState(() {
       _isSOSLoading = true;
     });
@@ -296,100 +306,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// Handles reporting an unsafe zone at current location
+  /// Handles reporting an unsafe zone using the new map-based screen
   Future<void> _handleReportUnsafeZone() async {
-    // First, show dialog to get the reason
-    final String? reason = await _showReasonDialog();
-    if (reason == null || reason.trim().isEmpty) {
-      return; // User cancelled or didn't provide a reason
-    }
-
-    setState(() {
-      _isReportingUnsafe = true;
-    });
-
-    try {
-      // Get current location using LocationService
-      final position = await _locationService.getCurrentLocation();
-
-      // Report unsafe zone to database
-      await _databaseService.reportUnsafeZone(
-        position.latitude,
-        position.longitude,
-        reason.trim(),
-      );
-
-      // Show success message
-      if (mounted) {
-        _showSuccessSnackBar(
-          '⚠️ Unsafe zone reported successfully! Thank you for keeping the community safe.',
-        );
-      }
-    } on LocationServiceException catch (e) {
-      // Handle location-specific errors with clear messages
-      if (mounted) {
-        _showErrorSnackBar(e.message);
-      }
-    } catch (e) {
-      debugPrint('Report Unsafe Zone error: $e');
-      if (mounted) {
-        String errorMessage = 'Failed to report unsafe zone';
-        if (e.toString().contains('No authenticated user')) {
-          errorMessage = 'Authentication error. Please log in again.';
-        }
-        _showErrorSnackBar(errorMessage);
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isReportingUnsafe = false;
-        });
-      }
-    }
-  }
-
-  /// Shows dialog to get the reason for reporting unsafe zone
-  Future<String?> _showReasonDialog() async {
-    final TextEditingController controller = TextEditingController();
-
-    return showDialog<String>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Report Unsafe Zone'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Please provide a reason why this area is unsafe:'),
-              const SizedBox(height: 16),
-              TextField(
-                controller: controller,
-                decoration: const InputDecoration(
-                  hintText: 'e.g., Poor lighting, Recent incidents, etc.',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-                maxLength: 200,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(null),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final reason = controller.text.trim();
-                if (reason.isNotEmpty) {
-                  Navigator.of(context).pop(reason);
-                }
-              },
-              child: const Text('Report'),
-            ),
-          ],
-        );
-      },
+    // Navigate to the new map-based unsafe zone reporting screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ReportUnsafeZoneScreen(),
+      ),
     );
   }
 
@@ -629,7 +553,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           context,
                           MaterialPageRoute(
                             builder: (context) =>
-                                const GuardianDashboardSafeScreen(),
+                                const GuardianDashboardScreen(),
                           ),
                         );
                       },
