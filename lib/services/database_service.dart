@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 import '../models/emergency_contact.dart';
+import '../models/enhanced_emergency_contact.dart';
 import '../models/emergency_event.dart';
 import '../models/unsafe_zone.dart';
 import '../models/live_location.dart';
@@ -189,7 +190,7 @@ class DatabaseService {
   ///
   /// Creates a document in the top-level 'emergencies' collection with
   /// the current user's UID, location data, address, and server timestamp.
-  Future<void> logEmergency(double lat, double lng, String address) async {
+  Future<String> logEmergency(double lat, double lng, String address) async {
     try {
       final userId = _currentUserId;
       final docRef = await _firestore.collection('emergencies').add({
@@ -202,6 +203,7 @@ class DatabaseService {
       });
 
       debugPrint('Emergency logged successfully: ${docRef.id}');
+      return docRef.id;
     } catch (e) {
       debugPrint('Error logging emergency: $e');
       rethrow;
@@ -471,5 +473,238 @@ class DatabaseService {
   /// Gets the current user's live location sharing status.
   Future<bool> isCurrentUserSharingLocation() async {
     return isUserSharingLocation(_currentUserId);
+  }
+
+  // ============================================================================
+  // ENHANCED EMERGENCY CONTACT METHODS
+  // ============================================================================
+
+  /// Adds a new enhanced emergency contact for the current user.
+  Future<void> addEnhancedEmergencyContact(EnhancedEmergencyContact contact) async {
+    try {
+      final userId = _currentUserId;
+      final docRef = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('enhanced_emergency_contacts')
+          .add(contact.toMap());
+
+      debugPrint('Enhanced emergency contact added successfully: ${docRef.id}');
+    } catch (e) {
+      debugPrint('Error adding enhanced emergency contact: $e');
+      rethrow;
+    }
+  }
+
+  /// Gets all enhanced emergency contacts for the current user.
+  Future<List<EnhancedEmergencyContact>> getEnhancedEmergencyContacts() async {
+    try {
+      final userId = _currentUserId;
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('enhanced_emergency_contacts')
+          .get();
+
+      return snapshot.docs
+          .map((doc) => EnhancedEmergencyContact.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      debugPrint('Error getting enhanced emergency contacts: $e');
+      rethrow;
+    }
+  }
+
+  /// Updates an enhanced emergency contact.
+  Future<void> updateEnhancedEmergencyContact(EnhancedEmergencyContact contact) async {
+    try {
+      final userId = _currentUserId;
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('enhanced_emergency_contacts')
+          .doc(contact.id)
+          .update(contact.toMap());
+
+      debugPrint('Enhanced emergency contact updated successfully: ${contact.id}');
+    } catch (e) {
+      debugPrint('Error updating enhanced emergency contact: $e');
+      rethrow;
+    }
+  }
+
+  /// Adds a location update for the current user.
+  Future<void> addLocationUpdate(LocationData locationData) async {
+    try {
+      final userId = _currentUserId;
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('location_history')
+          .add(locationData.toMap());
+
+      debugPrint('Location update added successfully');
+    } catch (e) {
+      debugPrint('Error adding location update: $e');
+      rethrow;
+    }
+  }
+
+  /// Gets recent location updates for the current user.
+  Future<List<LocationData>> getRecentUserLocations({int limit = 50}) async {
+    try {
+      final userId = _currentUserId;
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('location_history')
+          .orderBy('timestamp', descending: true)
+          .limit(limit)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => LocationData.fromMap(doc.data()))
+          .toList();
+    } catch (e) {
+      debugPrint('Error getting recent user locations: $e');
+      rethrow;
+    }
+  }
+
+  /// Updates user's current location.
+  Future<void> updateUserLocation(ContactLocation location) async {
+    try {
+      final userId = _currentUserId;
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .update({
+        'currentLocation': location.toMap(),
+        'lastLocationUpdate': Timestamp.fromDate(DateTime.now()),
+      });
+
+      debugPrint('User location updated successfully');
+    } catch (e) {
+      debugPrint('Error updating user location: $e');
+      rethrow;
+    }
+  }
+
+  /// Adds an emergency notification record.
+  Future<void> addEmergencyNotification(EmergencyNotification notification) async {
+    try {
+      await _firestore
+          .collection('emergency_notifications')
+          .doc(notification.id)
+          .set(notification.toMap());
+
+      debugPrint('Emergency notification added successfully: ${notification.id}');
+    } catch (e) {
+      debugPrint('Error adding emergency notification: $e');
+      rethrow;
+    }
+  }
+
+  /// Gets all notifications for an emergency.
+  Future<List<EmergencyNotification>> getEmergencyNotifications(String emergencyId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('emergency_notifications')
+          .where('emergencyId', isEqualTo: emergencyId)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => EmergencyNotification.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      debugPrint('Error getting emergency notifications: $e');
+      rethrow;
+    }
+  }
+
+  /// Gets contacts that have been notified for an emergency.
+  Future<List<EmergencyNotification>> getNotifiedContacts(String emergencyId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('emergency_notifications')
+          .where('emergencyId', isEqualTo: emergencyId)
+          .where('status', whereIn: ['sent', 'delivered', 'read', 'responded'])
+          .get();
+
+      return snapshot.docs
+          .map((doc) => EmergencyNotification.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      debugPrint('Error getting notified contacts: $e');
+      rethrow;
+    }
+  }
+
+  /// Updates notification response.
+  Future<void> updateNotificationResponse(
+    String emergencyId,
+    String contactId,
+    ContactResponse response,
+  ) async {
+    try {
+      final snapshot = await _firestore
+          .collection('emergency_notifications')
+          .where('emergencyId', isEqualTo: emergencyId)
+          .where('contactId', isEqualTo: contactId)
+          .get();
+
+      for (final doc in snapshot.docs) {
+        await doc.reference.update({
+          'response': response.toString().split('.').last,
+          'respondedAt': Timestamp.fromDate(DateTime.now()),
+          'status': 'responded',
+        });
+      }
+
+      debugPrint('Notification response updated successfully');
+    } catch (e) {
+      debugPrint('Error updating notification response: $e');
+      rethrow;
+    }
+  }
+
+  /// Marks a notification as expired.
+  Future<void> markNotificationExpired(String emergencyId, String contactId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('emergency_notifications')
+          .where('emergencyId', isEqualTo: emergencyId)
+          .where('contactId', isEqualTo: contactId)
+          .get();
+
+      for (final doc in snapshot.docs) {
+        await doc.reference.update({
+          'status': 'expired',
+        });
+      }
+
+      debugPrint('Notification marked as expired');
+    } catch (e) {
+      debugPrint('Error marking notification as expired: $e');
+      rethrow;
+    }
+  }
+
+  /// Gets an emergency event by ID.
+  Future<EmergencyEvent?> getEmergencyEvent(String emergencyId) async {
+    try {
+      final doc = await _firestore
+          .collection('emergency_events')
+          .doc(emergencyId)
+          .get();
+
+      if (doc.exists && doc.data() != null) {
+        return EmergencyEvent.fromMap(doc.data()!, doc.id);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getting emergency event: $e');
+      rethrow;
+    }
   }
 }

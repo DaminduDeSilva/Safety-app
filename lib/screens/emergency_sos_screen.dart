@@ -4,6 +4,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import '../services/database_service.dart';
 import '../services/location_service.dart';
+import '../services/intelligent_notification_service.dart';
 import '../models/emergency_contact.dart';
 
 /// Enhanced Emergency SOS screen with Google Maps integration and auto-trigger.
@@ -21,6 +22,7 @@ class EmergencySOSScreen extends StatefulWidget {
 class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
   final DatabaseService _databaseService = DatabaseService();
   final LocationService _locationService = LocationService();
+  final IntelligentNotificationService _notificationService = IntelligentNotificationService();
 
   GoogleMapController? _mapController;
   Timer? _autoTriggerTimer;
@@ -151,10 +153,18 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
       );
 
       // Log emergency in database
-      await _databaseService.logEmergency(
+      final emergencyId = await _databaseService.logEmergency(
         _emergencyLocation!.latitude,
         _emergencyLocation!.longitude,
         _emergencyAddress ?? 'Location not available',
+      );
+
+      // Trigger intelligent notifications
+      await _notificationService.triggerEmergencyNotifications(
+        emergencyId: emergencyId,
+        latitude: _emergencyLocation!.latitude,
+        longitude: _emergencyLocation!.longitude,
+        address: _emergencyAddress ?? 'Location not available',
       );
 
       if (mounted) {
