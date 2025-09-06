@@ -8,4 +8,6 @@
     <!-- Location permissions for emergency features in profile mode -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Contacts permission for importing emergency contacts in profile mode -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
 </manifest>

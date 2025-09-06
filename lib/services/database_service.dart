@@ -5,6 +5,7 @@ import '../models/user_model.dart';
 import '../models/emergency_contact.dart';
 import '../models/emergency_event.dart';
 import '../models/unsafe_zone.dart';
+import '../models/live_location.dart';
 
 /// Central database service for handling all Firestore operations.
 ///
@@ -154,6 +155,28 @@ class DatabaseService {
       debugPrint('Emergency contact deleted successfully: $contactId');
     } catch (e) {
       debugPrint('Error deleting emergency contact: $e');
+      rethrow;
+    }
+  }
+
+  /// Gets a real-time stream of emergency contacts for the current user.
+  ///
+  /// Returns a stream that updates whenever contacts are added, modified, or deleted.
+  Stream<List<EmergencyContact>> getEmergencyContactsStream() {
+    try {
+      final userId = _currentUserId;
+      return _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('emergency_contacts')
+          .snapshots()
+          .map(
+            (snapshot) => snapshot.docs
+                .map((doc) => EmergencyContact.fromMap(doc.data(), doc.id))
+                .toList(),
+          );
+    } catch (e) {
+      debugPrint('Error getting emergency contacts stream: $e');
       rethrow;
     }
   }
@@ -333,5 +356,120 @@ class DatabaseService {
       debugPrint('Error verifying unsafe zone: $e');
       rethrow;
     }
+  }
+
+  // ============================================================================
+  // LIVE LOCATION SHARING METHODS
+  // ============================================================================
+
+  /// Starts live location sharing for the current user.
+  ///
+  /// Creates or updates a document in the 'live_locations' collection.
+  Future<void> startLiveSharing(
+    double latitude,
+    double longitude, {
+    String? address,
+  }) async {
+    try {
+      final liveLocation = LiveLocation(
+        userId: _currentUserId,
+        latitude: latitude,
+        longitude: longitude,
+        timestamp: DateTime.now(),
+        status: 'active',
+        address: address,
+      );
+
+      await _firestore
+          .collection('live_locations')
+          .doc(_currentUserId)
+          .set(liveLocation.toMap());
+
+      debugPrint('Live location sharing started for user: $_currentUserId');
+    } catch (e) {
+      debugPrint('Error starting live sharing: $e');
+      rethrow;
+    }
+  }
+
+  /// Updates the current user's live location with new coordinates.
+  ///
+  /// Updates the existing document with new coordinates and timestamp.
+  Future<void> updateLiveLocation(
+    double latitude,
+    double longitude, {
+    String? address,
+  }) async {
+    try {
+      await _firestore.collection('live_locations').doc(_currentUserId).update({
+        'latitude': latitude,
+        'longitude': longitude,
+        'timestamp': Timestamp.fromDate(DateTime.now()),
+        'status': 'active',
+        if (address != null) 'address': address,
+      });
+
+      debugPrint('Live location updated for user: $_currentUserId');
+    } catch (e) {
+      debugPrint('Error updating live location: $e');
+      rethrow;
+    }
+  }
+
+  /// Stops live location sharing for the current user.
+  ///
+  /// Sets the status to 'finished' instead of deleting to maintain history.
+  Future<void> stopLiveSharing() async {
+    try {
+      await _firestore.collection('live_locations').doc(_currentUserId).update({
+        'status': 'finished',
+        'timestamp': Timestamp.fromDate(DateTime.now()),
+      });
+
+      debugPrint('Live location sharing stopped for user: $_currentUserId');
+    } catch (e) {
+      debugPrint('Error stopping live sharing: $e');
+      rethrow;
+    }
+  }
+
+  /// Gets a stream of live location updates for a specific user.
+  ///
+  /// Returns a stream that emits LiveLocation objects whenever the document updates.
+  Stream<LiveLocation?> getLiveLocationStream(String userId) {
+    return _firestore.collection('live_locations').doc(userId).snapshots().map((
+      snapshot,
+    ) {
+      if (snapshot.exists) {
+        return LiveLocation.fromDocument(snapshot);
+      }
+      return null;
+    });
+  }
+
+  /// Checks if a user is currently sharing their live location.
+  ///
+  /// Returns true if the user has an active live location sharing session.
+  Future<bool> isUserSharingLocation(String userId) async {
+    try {
+      final doc = await _firestore
+          .collection('live_locations')
+          .doc(userId)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
+        return data['status'] == 'active';
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error checking live location status: $e');
+      return false;
+    }
+  }
+
+  /// Gets the current user's live location sharing status.
+  Future<bool> isCurrentUserSharingLocation() async {
+    return isUserSharingLocation(_currentUserId);
   }
 }

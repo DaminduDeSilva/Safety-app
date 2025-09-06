@@ -51,5 +51,9 @@
 	<string>This app needs location access to send your location during emergencies and report unsafe areas to help keep you and your community safe.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>This app needs location access to send your location during emergencies and report unsafe areas to help keep you and your community safe.</string>
+	
+	<!-- Contacts permission for importing emergency contacts -->
+	<key>NSContactsUsageDescription</key>
+	<string>This app needs access to your contacts to allow you to easily import emergency contacts from your address book.</string>
 </dict>
 </plist>
