@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../services/location_service.dart';
+import '../widgets/sos_button.dart';
+import '../widgets/action_card.dart';
 import 'contacts_screen.dart';
 import 'live_location_screen.dart'; // Updated to use Google Maps version
 import 'guardian_dashboard_screen.dart'; // Updated to use Google Maps version
@@ -352,276 +354,323 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(
-        title: const Text(
-          'Syntax Safety',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: const Text('Syntax Safety'),
+        centerTitle: true,
+        backgroundColor: const Color(0xFFFAFAFA),
+        elevation: 0,
         actions: [
-          IconButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const ContactsScreen()),
-              );
-            },
-            icon: const Icon(Icons.contacts),
-            tooltip: 'Manage Contacts',
-          ),
-          IconButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const LiveLocationTestScreen(),
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.black.withOpacity(0.1)),
+              boxShadow: [
+                BoxShadow(
+                  offset: const Offset(2, 2),
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 0,
                 ),
-              );
-            },
-            icon: const Icon(Icons.bug_report),
-            tooltip: 'Test Live Location',
+              ],
+            ),
+            child: IconButton(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const ContactsScreen()),
+                );
+              },
+              icon: const Icon(Icons.contacts, color: Color(0xFF2563EB)),
+              tooltip: 'Emergency Contacts',
+            ),
           ),
-          IconButton(
-            onPressed: _handleLogout,
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sign Out',
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.black.withOpacity(0.1)),
+              boxShadow: [
+                BoxShadow(
+                  offset: const Offset(2, 2),
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 0,
+                ),
+              ],
+            ),
+            child: IconButton(
+              onPressed: _handleLogout,
+              icon: const Icon(Icons.logout, color: Color(0xFFF97316)),
+              tooltip: 'Sign Out',
+            ),
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Welcome Section
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Welcome back!',
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue,
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _userEmail,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Stay safe and help keep your community secure.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ],
-                ),
+            // Status Header
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.black.withOpacity(0.1), width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    offset: const Offset(6, 6),
+                    color: Colors.black.withOpacity(0.25),
+                    blurRadius: 0,
+                  ),
+                ],
               ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Emergency SOS Button
-            Expanded(
-              flex: 2,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Emergency Alert',
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.red,
-                          ),
-                    ),
-                    const SizedBox(height: 16),
-                    FloatingActionButton.large(
-                      onPressed: _isSOSLoading ? null : _handleSOSEmergency,
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                      child: _isSOSLoading
-                          ? const CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 3,
-                            )
-                          : const Icon(Icons.warning, size: 48),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Press for Emergency',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Colors.red,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'This will send your location to emergency services',
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    // Power Button SOS indicator
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.blue.withValues(alpha: 0.3),
-                          width: 1,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              offset: const Offset(2, 2),
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 0,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.shield_rounded,
+                          color: Colors.white,
+                          size: 24,
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.power_settings_new,
-                            size: 18,
-                            color: Colors.blue[700],
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'You\'re Safe',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF111827),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _userEmail,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF6B7280),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0F9FF),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.power_settings_new,
+                          size: 20,
+                          color: const Color(0xFF2563EB),
+                        ),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
                             'Press power button 5 times for quick SOS',
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: Colors.blue[700],
-                                  fontWeight: FontWeight.w500,
-                                ),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF2563EB),
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
 
             const SizedBox(height: 32),
 
-            // Live Location and Guardian Dashboard Buttons
-            Row(
+            // Emergency SOS Section
+            const Text(
+              'Emergency Response',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF111827),
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            Center(
+              child: Column(
+                children: [
+                  SOSButton(
+                    onPressed: _isSOSLoading ? null : _handleSOSEmergency,
+                    isLoading: _isSOSLoading,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Emergency SOS',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFDC2626),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Instantly alert emergency contacts\nwith your current location',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF6B7280),
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 40),
+
+            // Quick Actions
+            const Text(
+              'Quick Actions',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF111827),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Action Cards Grid
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: 1.2,
               children: [
-                Expanded(
-                  child: SizedBox(
-                    height: 56,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const LiveLocationScreen(),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                ActionCard(
+                  title: 'Live Location',
+                  icon: Icons.location_on_rounded,
+                  color: const Color(0xFF2563EB),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LiveLocationScreen(),
                       ),
-                      icon: const Icon(Icons.location_on),
-                      label: const Text(
-                        'Live Location',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: SizedBox(
-                    height: 56,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                const GuardianDashboardScreen(),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                ActionCard(
+                  title: 'Guardian Dashboard',
+                  icon: Icons.security_rounded,
+                  color: const Color(0xFF10B981),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const GuardianDashboardScreen(),
                       ),
-                      icon: const Icon(Icons.security),
-                      label: const Text(
-                        'Guardian',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    );
+                  },
+                ),
+                ActionCard(
+                  title: 'Report Unsafe Zone',
+                  icon: Icons.report_problem_rounded,
+                  color: const Color(0xFFF97316),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ReportUnsafeZoneScreen(),
                       ),
-                    ),
-                  ),
+                    );
+                  },
+                  isLoading: _isReportingUnsafe,
+                ),
+                ActionCard(
+                  title: 'Emergency Contacts',
+                  icon: Icons.contacts_rounded,
+                  color: const Color(0xFF8B5CF6),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ContactsScreen(),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 32),
 
-            // Report Unsafe Zone Button
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton.icon(
-                onPressed: _isReportingUnsafe ? null : _handleReportUnsafeZone,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                icon: _isReportingUnsafe
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Icon(Icons.report_problem),
-                label: Text(
-                  _isReportingUnsafe ? 'Reporting...' : 'Report Unsafe Zone',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+            // Bottom Info
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9FAFB),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.black.withOpacity(0.1)),
               ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Additional Info
-            Text(
-              'Help make your community safer by reporting dangerous areas or requesting immediate assistance.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
-              textAlign: TextAlign.center,
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: const Color(0xFF6B7280),
+                    size: 24,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Help make your community safer',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF374151),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Report dangerous areas and stay connected with your emergency contacts for maximum safety.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF6B7280),
+                      height: 1.4,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
