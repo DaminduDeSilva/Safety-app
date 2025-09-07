@@ -483,7 +483,7 @@ class _InvitationScreenState extends State<InvitationScreen>
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  initialValue: selectedRelationship,
+                  value: selectedRelationship,
                   decoration: const InputDecoration(
                     labelText: 'Relationship (Optional)',
                     prefixIcon: Icon(Icons.people),
