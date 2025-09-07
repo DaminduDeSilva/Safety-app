@@ -6,6 +6,9 @@ class EmergencyContact {
   /// Unique identifier for this emergency contact
   final String id;
 
+  /// User ID of the contact (for live location tracking)
+  final String? contactId;
+
   /// Full name of the emergency contact
   final String name;
 
@@ -21,6 +24,7 @@ class EmergencyContact {
   /// Creates a new [EmergencyContact] instance.
   const EmergencyContact({
     required this.id,
+    this.contactId,
     required this.name,
     required this.phoneNumber,
     required this.relationship,
@@ -34,6 +38,7 @@ class EmergencyContact {
   factory EmergencyContact.fromMap(Map<String, dynamic> map, String id) {
     return EmergencyContact(
       id: id,
+      contactId: map['contactId'] as String?,
       name: map['name'] as String,
       phoneNumber: map['phoneNumber'] as String,
       relationship: map['relationship'] as String,
@@ -46,6 +51,7 @@ class EmergencyContact {
   /// Note: The ID is not included in the map as it serves as the document ID.
   Map<String, dynamic> toMap() {
     return {
+      'contactId': contactId,
       'name': name,
       'phoneNumber': phoneNumber,
       'relationship': relationship,
@@ -56,6 +62,7 @@ class EmergencyContact {
   /// Creates a copy of this [EmergencyContact] with the given fields replaced.
   EmergencyContact copyWith({
     String? id,
+    String? contactId,
     String? name,
     String? phoneNumber,
     String? relationship,
@@ -63,6 +70,7 @@ class EmergencyContact {
   }) {
     return EmergencyContact(
       id: id ?? this.id,
+      contactId: contactId ?? this.contactId,
       name: name ?? this.name,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       relationship: relationship ?? this.relationship,
@@ -72,7 +80,7 @@ class EmergencyContact {
 
   @override
   String toString() {
-    return 'EmergencyContact(id: $id, name: $name, phoneNumber: $phoneNumber, relationship: $relationship, isPrimary: $isPrimary)';
+    return 'EmergencyContact(id: $id, contactId: $contactId, name: $name, phoneNumber: $phoneNumber, relationship: $relationship, isPrimary: $isPrimary)';
   }
 
   @override
@@ -80,6 +88,7 @@ class EmergencyContact {
     if (identical(this, other)) return true;
     return other is EmergencyContact &&
         other.id == id &&
+        other.contactId == contactId &&
         other.name == name &&
         other.phoneNumber == phoneNumber &&
         other.relationship == relationship &&
@@ -89,6 +98,7 @@ class EmergencyContact {
   @override
   int get hashCode {
     return id.hashCode ^
+        contactId.hashCode ^
         name.hashCode ^
         phoneNumber.hashCode ^
         relationship.hashCode ^

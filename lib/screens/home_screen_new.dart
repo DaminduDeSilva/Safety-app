@@ -5,8 +5,6 @@ import '../services/location_service.dart';
 import '../models/user_model.dart';
 import 'live_location_screen.dart';
 import 'report_unsafe_zone_screen.dart';
-import 'emergency_sos_screen.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 /// Clean and focused home dashboard for the safety app.
 ///
@@ -23,7 +21,6 @@ class _HomeScreenState extends State<HomeScreen> {
   final DatabaseService _databaseService = DatabaseService();
   final LocationService _locationService = LocationService();
   UserModel? _userProfile;
-  bool _isSOSLoading = false;
 
   @override
   void initState() {
@@ -65,11 +62,6 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             // Welcome Section
             _buildWelcomeSection(),
-
-            const SizedBox(height: 20),
-
-            // Emergency SOS Button Section
-            _buildEmergencySOSSection(),
 
             const SizedBox(height: 24),
 
@@ -353,199 +345,5 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
-  }
-
-  /// Builds the emergency SOS section
-  Widget _buildEmergencySOSSection() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.red[600]!, Colors.red[400]!],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.red.withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: _isSOSLoading ? null : _handleSOSEmergency,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (_isSOSLoading) ...[
-                      const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                    ] else ...[
-                      const Icon(
-                        Icons.warning_rounded,
-                        color: Colors.white,
-                        size: 32,
-                      ),
-                      const SizedBox(width: 12),
-                    ],
-                    const Text(
-                      'EMERGENCY SOS',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _isSOSLoading
-                      ? 'Sending emergency alert...'
-                      : 'Tap to alert guardians & emergency services',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    '🚨 Only use in real emergencies',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Handles the SOS emergency button press
-  Future<void> _handleSOSEmergency() async {
-    // Navigate to the Emergency SOS screen for enhanced visual feedback
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const EmergencySOSScreen()),
-    );
-
-    setState(() {
-      _isSOSLoading = true;
-    });
-
-    try {
-      // Step 1: Get current location using LocationService
-      final position = await _locationService.getCurrentLocation();
-
-      // Step 2: Convert coordinates to address using LocationService
-      final address = await _locationService.getAddressFromLatLng(
-        position.latitude,
-        position.longitude,
-      );
-
-      // Step 3: Log emergency to database
-      await _databaseService.logEmergency(
-        position.latitude,
-        position.longitude,
-        address,
-      );
-
-      // Step 4: Fetch emergency contacts
-      final contacts = await _databaseService.getEmergencyContacts();
-
-      // Step 5: Build the alert message
-      final mapsUrl =
-          'https://maps.google.com/?q=${position.latitude},${position.longitude}';
-      final smsMessage =
-          'EMERGENCY! I need help!\n'
-          'Location: $address\n'
-          'Google Maps: $mapsUrl\n'
-          'Please check on me ASAP.';
-
-      // Step 6: Send SMS to each contact
-      for (final contact in contacts) {
-        try {
-          final smsUrl = Uri.parse(
-            'sms:${contact.phoneNumber}?body=${Uri.encodeComponent(smsMessage)}',
-          );
-          await launchUrl(smsUrl);
-          debugPrint('SMS sent to ${contact.name} (${contact.phoneNumber})');
-        } catch (e) {
-          debugPrint('Failed to send SMS to ${contact.phoneNumber}: $e');
-          // Continue to next contact - don't let SMS failure stop the emergency alert
-        }
-      }
-
-      // Step 7: Make emergency call
-      final Uri emergencyCall = Uri(scheme: 'tel', path: '911');
-      if (await canLaunchUrl(emergencyCall)) {
-        await launchUrl(emergencyCall);
-      }
-
-      if (mounted) {
-        final contactCount = contacts.length;
-        final contactText = contactCount > 0
-            ? ' SMS alerts sent to $contactCount contact${contactCount == 1 ? '' : 's'}.'
-            : ' No emergency contacts found to notify.';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '🚨 Emergency alert sent!$contactText Calling emergency services...',
-            ),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        String errorMessage = 'Failed to send emergency alert';
-        if (e.toString().contains('No authenticated user')) {
-          errorMessage = 'Authentication error. Please log in again.';
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSOSLoading = false;
-        });
-      }
-    }
   }
 }

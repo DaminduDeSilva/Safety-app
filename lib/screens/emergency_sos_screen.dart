@@ -22,7 +22,8 @@ class EmergencySOSScreen extends StatefulWidget {
 class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
   final DatabaseService _databaseService = DatabaseService();
   final LocationService _locationService = LocationService();
-  final IntelligentNotificationService _notificationService = IntelligentNotificationService();
+  final IntelligentNotificationService _notificationService =
+      IntelligentNotificationService();
 
   GoogleMapController? _mapController;
   Timer? _autoTriggerTimer;
@@ -77,9 +78,7 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
       // Update map camera
       if (_mapController != null) {
         _mapController!.animateCamera(
-          CameraUpdate.newLatLng(
-            LatLng(position.latitude, position.longitude),
-          ),
+          CameraUpdate.newLatLng(LatLng(position.latitude, position.longitude)),
         );
       }
 
@@ -88,8 +87,8 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
         _startAutoTriggerCountdown();
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error initializing emergency: $e')),
         );
@@ -187,11 +186,11 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
         });
       }
     } catch (e) {
-      setState(() => _sosTriggered = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error triggering SOS: $e')),
-        );
+        setState(() => _sosTriggered = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error triggering SOS: $e')));
       }
     }
   }
@@ -239,7 +238,7 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          _sosTriggered 
+                          _sosTriggered
                               ? '🚨 EMERGENCY ACTIVATED'
                               : 'Ready to Send Emergency Alert',
                           style: TextStyle(
@@ -257,10 +256,14 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
                               color: Colors.white.withValues(alpha: 0.9),
                             ),
                           ),
-                        ] else if (_autoTriggerEnabled && _countdownSeconds > 0) ...[
+                        ] else if (_autoTriggerEnabled &&
+                            _countdownSeconds > 0) ...[
                           const SizedBox(height: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.orange,
                               borderRadius: BorderRadius.circular(20),
@@ -268,7 +271,11 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.timer, color: Colors.white, size: 20),
+                                const Icon(
+                                  Icons.timer,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Auto-trigger in $_countdownSeconds seconds',
@@ -293,7 +300,10 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
                         ] else if (!_autoTriggerEnabled) ...[
                           const SizedBox(height: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.grey,
                               borderRadius: BorderRadius.circular(15),
@@ -301,7 +311,11 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.timer_off, color: Colors.white, size: 16),
+                                Icon(
+                                  Icons.timer_off,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
                                 SizedBox(width: 6),
                                 Text(
                                   'Auto-trigger disabled',
@@ -440,12 +454,17 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.warning, color: Colors.orange.shade700),
+                                Icon(
+                                  Icons.warning,
+                                  color: Colors.orange.shade700,
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     'No emergency contacts added yet. Add contacts from the main screen.',
-                                    style: TextStyle(color: Colors.orange.shade700),
+                                    style: TextStyle(
+                                      color: Colors.orange.shade700,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -470,8 +489,12 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
                                     title: Text(contact.name),
                                     subtitle: Text(contact.phoneNumber),
                                     trailing: Icon(
-                                      _sosTriggered ? Icons.check_circle : Icons.phone,
-                                      color: _sosTriggered ? Colors.green : Colors.red,
+                                      _sosTriggered
+                                          ? Icons.check_circle
+                                          : Icons.phone,
+                                      color: _sosTriggered
+                                          ? Colors.green
+                                          : Colors.red,
                                     ),
                                   ),
                                 );
@@ -490,22 +513,30 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
                             child: OutlinedButton.icon(
                               onPressed: _toggleAutoTrigger,
                               icon: Icon(
-                                _autoTriggerEnabled ? Icons.timer_off : Icons.timer,
-                                color: _autoTriggerEnabled ? Colors.orange : Colors.green,
+                                _autoTriggerEnabled
+                                    ? Icons.timer_off
+                                    : Icons.timer,
+                                color: _autoTriggerEnabled
+                                    ? Colors.orange
+                                    : Colors.green,
                               ),
                               label: Text(
-                                _autoTriggerEnabled 
-                                    ? 'DISABLE AUTO-TRIGGER' 
+                                _autoTriggerEnabled
+                                    ? 'DISABLE AUTO-TRIGGER'
                                     : 'ENABLE AUTO-TRIGGER',
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: _autoTriggerEnabled ? Colors.orange : Colors.green,
+                                  color: _autoTriggerEnabled
+                                      ? Colors.orange
+                                      : Colors.green,
                                 ),
                               ),
                               style: OutlinedButton.styleFrom(
                                 side: BorderSide(
-                                  color: _autoTriggerEnabled ? Colors.orange : Colors.green,
+                                  color: _autoTriggerEnabled
+                                      ? Colors.orange
+                                      : Colors.green,
                                   width: 2,
                                 ),
                                 shape: RoundedRectangleBorder(
@@ -524,7 +555,9 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
                           child: ElevatedButton(
                             onPressed: _sosTriggered ? null : _triggerSOS,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: _sosTriggered ? Colors.grey : Colors.red,
+                              backgroundColor: _sosTriggered
+                                  ? Colors.grey
+                                  : Colors.red,
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
@@ -551,7 +584,8 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
                                       const Icon(Icons.emergency, size: 28),
                                       const SizedBox(width: 8),
                                       Text(
-                                        _autoTriggerEnabled && _countdownSeconds > 0
+                                        _autoTriggerEnabled &&
+                                                _countdownSeconds > 0
                                             ? 'TRIGGER SOS NOW ($_countdownSeconds)'
                                             : 'TRIGGER SOS',
                                         style: const TextStyle(

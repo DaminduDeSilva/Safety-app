@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/emergency_invitation.dart';
+import '../models/emergency_contact.dart';
 import '../models/user_model.dart';
 import 'database_service.dart';
 
@@ -154,11 +155,11 @@ class InvitationService {
   Future<List<EmergencyInvitation>> getReceivedInvitations() async {
     try {
       final currentUser = _auth.currentUser;
-      if (currentUser == null) return [];
+      if (currentUser == null || currentUser.email == null) return [];
 
       final querySnapshot = await _firestore
           .collection('invitations')
-          .where('recipientUserId', isEqualTo: currentUser.uid)
+          .where('recipientEmail', isEqualTo: currentUser.email!.toLowerCase())
           .where('status', isEqualTo: 'pending')
           .orderBy('sentAt', descending: true)
           .get();
@@ -171,54 +172,6 @@ class InvitationService {
       debugPrint('Error getting received invitations: $e');
       return [];
     }
-  }
-
-  /// Stream of received invitations for real-time updates
-  Stream<List<EmergencyInvitation>> getReceivedInvitationsStream() {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null) {
-      return Stream.value([]);
-    }
-
-    return _firestore
-        .collection('invitations')
-        .where('recipientUserId', isEqualTo: currentUser.uid)
-        .where('status', isEqualTo: 'pending')
-        .orderBy('sentAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => EmergencyInvitation.fromMap(doc.data(), doc.id))
-              .where((invitation) => !invitation.isExpired)
-              .toList();
-        })
-        .handleError((error) {
-          debugPrint('Error in received invitations stream: $error');
-          return <EmergencyInvitation>[];
-        });
-  }
-
-  /// Stream of sent invitations for real-time updates
-  Stream<List<EmergencyInvitation>> getSentInvitationsStream() {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null) {
-      return Stream.value([]);
-    }
-
-    return _firestore
-        .collection('invitations')
-        .where('senderUserId', isEqualTo: currentUser.uid)
-        .orderBy('sentAt', descending: true)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => EmergencyInvitation.fromMap(doc.data(), doc.id))
-              .toList();
-        })
-        .handleError((error) {
-          debugPrint('Error in sent invitations stream: $error');
-          return <EmergencyInvitation>[];
-        });
   }
 
   /// Accepts an invitation by invite code
@@ -373,21 +326,13 @@ class InvitationService {
         'invitationId': invitation.id,
       };
 
-      // Use batch write for atomicity - Write to user's emergency_contacts subcollection
+      // Use batch write for atomicity
       batch.set(
-        _firestore
-            .collection('users')
-            .doc(currentUser.uid)
-            .collection('emergency_contacts')
-            .doc(invitation.senderUserId),
+        _firestore.collection('emergencyContacts').doc(),
         recipientContactData,
       );
       batch.set(
-        _firestore
-            .collection('users')
-            .doc(invitation.senderUserId)
-            .collection('emergency_contacts')
-            .doc(currentUser.uid),
+        _firestore.collection('emergencyContacts').doc(),
         senderContactData,
       );
 

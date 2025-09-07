@@ -1,0 +1,72 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null; // Allow reading other users for search
+      
+      // Emergency contacts subcollection
+      match /emergency_contacts/{contactId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+        // Allow creating emergency contacts during invitation acceptance
+        allow create: if request.auth != null && 
+          request.resource.data.addedBy == 'invitation' &&
+          (request.auth.uid == userId || request.auth.uid == contactId);
+      }
+      
+      // Enhanced emergency contacts subcollection  
+      match /enhanced_emergency_contacts/{contactId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+    
+    // Invitations collection
+    match /invitations/{invitationId} {
+      allow read, write: if request.auth != null && 
+        (request.auth.uid == resource.data.senderUserId || 
+         request.auth.uid == resource.data.recipientUserId);
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.senderUserId;
+      // Allow querying by invite code for acceptance
+      allow read: if request.auth != null;
+    }
+    
+    // Emergency contacts collection (top-level)
+    match /emergencyContacts/{contactId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && 
+        (request.auth.uid == request.resource.data.userId ||
+         (request.resource.data.addedBy == 'invitation' &&
+          (request.auth.uid == request.resource.data.userId || request.auth.uid == request.resource.data.contactId)));
+    }
+    
+    // SOS calls collection
+    match /sosCalls/{callId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow read: if request.auth != null && request.auth.uid in resource.data.emergencyContactIds;
+    }
+    
+    // Emergencies collection
+    match /emergencies/{emergencyId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+    }
+    
+    // Live locations collection
+    match /live_locations/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Allow emergency contacts to read live location
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Unsafe zones collection
+    match /unsafe_zones/{zoneId} {
+      allow read: if request.auth != null; // All authenticated users can read unsafe zones
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+  }
+}

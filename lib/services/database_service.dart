@@ -7,6 +7,7 @@ import '../models/enhanced_emergency_contact.dart';
 import '../models/emergency_event.dart';
 import '../models/unsafe_zone.dart';
 import '../models/live_location.dart';
+import '../models/live_guardian.dart';
 
 /// Central database service for handling all Firestore operations.
 ///
@@ -47,6 +48,26 @@ class DatabaseService {
     }
   }
 
+  /// Creates a complete user profile in Firestore.
+  ///
+  /// This method is specifically for the profile setup process and includes
+  /// username uniqueness validation.
+  Future<void> createUserProfile(UserModel user) async {
+    try {
+      // Double-check username availability before creating
+      final isAvailable = await isUsernameAvailable(user.username);
+      if (!isAvailable) {
+        throw Exception('Username "${user.username}" is already taken');
+      }
+
+      await _firestore.collection('users').doc(user.uid).set(user.toMap());
+      debugPrint('User profile created successfully: ${user.uid}');
+    } catch (e) {
+      debugPrint('Error creating user profile: $e');
+      rethrow;
+    }
+  }
+
   /// Retrieves a user document from Firestore by UID.
   ///
   /// Returns null if the user document doesn't exist.
@@ -60,6 +81,53 @@ class DatabaseService {
       return null;
     } catch (e) {
       debugPrint('Error getting user: $e');
+      rethrow;
+    }
+  }
+
+  /// Gets the current user's profile.
+  Future<UserModel?> getUserProfile(String uid) async {
+    return await getUser(uid);
+  }
+
+  /// Checks if a user has a complete profile in Firestore.
+  Future<bool> isProfileComplete(String uid) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+
+      if (!doc.exists || doc.data() == null) {
+        return false;
+      }
+
+      final data = doc.data()!;
+      // Check if all required fields exist
+      return data.containsKey('username') &&
+          data.containsKey('firstName') &&
+          data.containsKey('lastName') &&
+          data.containsKey('phoneNumber') &&
+          data['username'] != null &&
+          data['firstName'] != null &&
+          data['lastName'] != null &&
+          data['phoneNumber'] != null;
+    } catch (e) {
+      debugPrint('Error checking profile completeness: $e');
+      return false;
+    }
+  }
+
+  /// Checks if a username is available.
+  Future<bool> isUsernameAvailable(String username) async {
+    try {
+      final normalizedUsername = username.toLowerCase().trim();
+      final query = await _firestore
+          .collection('users')
+          .where('username', isEqualTo: normalizedUsername)
+          .limit(1)
+          .get();
+
+      return query.docs.isEmpty;
+    } catch (e) {
+      debugPrint('Error checking username availability: $e');
       rethrow;
     }
   }
@@ -480,7 +548,9 @@ class DatabaseService {
   // ============================================================================
 
   /// Adds a new enhanced emergency contact for the current user.
-  Future<void> addEnhancedEmergencyContact(EnhancedEmergencyContact contact) async {
+  Future<void> addEnhancedEmergencyContact(
+    EnhancedEmergencyContact contact,
+  ) async {
     try {
       final userId = _currentUserId;
       final docRef = await _firestore
@@ -516,7 +586,9 @@ class DatabaseService {
   }
 
   /// Updates an enhanced emergency contact.
-  Future<void> updateEnhancedEmergencyContact(EnhancedEmergencyContact contact) async {
+  Future<void> updateEnhancedEmergencyContact(
+    EnhancedEmergencyContact contact,
+  ) async {
     try {
       final userId = _currentUserId;
       await _firestore
@@ -526,7 +598,9 @@ class DatabaseService {
           .doc(contact.id)
           .update(contact.toMap());
 
-      debugPrint('Enhanced emergency contact updated successfully: ${contact.id}');
+      debugPrint(
+        'Enhanced emergency contact updated successfully: ${contact.id}',
+      );
     } catch (e) {
       debugPrint('Error updating enhanced emergency contact: $e');
       rethrow;
@@ -575,10 +649,7 @@ class DatabaseService {
   Future<void> updateUserLocation(ContactLocation location) async {
     try {
       final userId = _currentUserId;
-      await _firestore
-          .collection('users')
-          .doc(userId)
-          .update({
+      await _firestore.collection('users').doc(userId).update({
         'currentLocation': location.toMap(),
         'lastLocationUpdate': Timestamp.fromDate(DateTime.now()),
       });
@@ -591,14 +662,18 @@ class DatabaseService {
   }
 
   /// Adds an emergency notification record.
-  Future<void> addEmergencyNotification(EmergencyNotification notification) async {
+  Future<void> addEmergencyNotification(
+    EmergencyNotification notification,
+  ) async {
     try {
       await _firestore
           .collection('emergency_notifications')
           .doc(notification.id)
           .set(notification.toMap());
 
-      debugPrint('Emergency notification added successfully: ${notification.id}');
+      debugPrint(
+        'Emergency notification added successfully: ${notification.id}',
+      );
     } catch (e) {
       debugPrint('Error adding emergency notification: $e');
       rethrow;
@@ -606,7 +681,9 @@ class DatabaseService {
   }
 
   /// Gets all notifications for an emergency.
-  Future<List<EmergencyNotification>> getEmergencyNotifications(String emergencyId) async {
+  Future<List<EmergencyNotification>> getEmergencyNotifications(
+    String emergencyId,
+  ) async {
     try {
       final snapshot = await _firestore
           .collection('emergency_notifications')
@@ -623,7 +700,9 @@ class DatabaseService {
   }
 
   /// Gets contacts that have been notified for an emergency.
-  Future<List<EmergencyNotification>> getNotifiedContacts(String emergencyId) async {
+  Future<List<EmergencyNotification>> getNotifiedContacts(
+    String emergencyId,
+  ) async {
     try {
       final snapshot = await _firestore
           .collection('emergency_notifications')
@@ -669,7 +748,10 @@ class DatabaseService {
   }
 
   /// Marks a notification as expired.
-  Future<void> markNotificationExpired(String emergencyId, String contactId) async {
+  Future<void> markNotificationExpired(
+    String emergencyId,
+    String contactId,
+  ) async {
     try {
       final snapshot = await _firestore
           .collection('emergency_notifications')
@@ -678,9 +760,7 @@ class DatabaseService {
           .get();
 
       for (final doc in snapshot.docs) {
-        await doc.reference.update({
-          'status': 'expired',
-        });
+        await doc.reference.update({'status': 'expired'});
       }
 
       debugPrint('Notification marked as expired');
@@ -705,6 +785,88 @@ class DatabaseService {
     } catch (e) {
       debugPrint('Error getting emergency event: $e');
       rethrow;
+    }
+  }
+
+  // ============================================================================
+  // LIVE GUARDIANS METHODS
+  // ============================================================================
+
+  /// Gets a stream of live guardians (emergency contacts with their live location status).
+  ///
+  /// Returns a stream that combines emergency contacts with their real-time location
+  /// sharing status for display in the "Live Guardians" section.
+  Stream<List<LiveGuardian>> getLiveGuardiansStream() {
+    try {
+      final userId = _currentUserId;
+
+      return _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('emergency_contacts')
+          .where(
+            'contactId',
+            isNotEqualTo: null,
+          ) // Only include contacts with contactId
+          .snapshots()
+          .asyncMap((contactsSnapshot) async {
+            final List<LiveGuardian> liveGuardians = [];
+
+            for (final contactDoc in contactsSnapshot.docs) {
+              try {
+                final contact = EmergencyContact.fromMap(
+                  contactDoc.data(),
+                  contactDoc.id,
+                );
+
+                // Skip contacts without contactId (manually added contacts)
+                if (contact.contactId == null) continue;
+
+                // Get live location for this contact
+                LiveLocation? liveLocation;
+                try {
+                  final locationDoc = await _firestore
+                      .collection('live_locations')
+                      .doc(contact.contactId!)
+                      .get();
+
+                  if (locationDoc.exists && locationDoc.data() != null) {
+                    final data = locationDoc.data()!;
+                    final status = data['status'] as String? ?? 'inactive';
+
+                    // Only include active location sharing
+                    if (status == 'active') {
+                      liveLocation = LiveLocation.fromDocument(locationDoc);
+                    }
+                  }
+                } catch (e) {
+                  debugPrint(
+                    'Error fetching live location for ${contact.contactId}: $e',
+                  );
+                  // Continue without location data
+                }
+
+                liveGuardians.add(
+                  LiveGuardian(contact: contact, liveLocation: liveLocation),
+                );
+              } catch (e) {
+                debugPrint('Error processing contact ${contactDoc.id}: $e');
+                // Continue with other contacts
+              }
+            }
+
+            // Sort by sharing status (sharing first), then by name
+            liveGuardians.sort((a, b) {
+              if (a.isSharingLocation && !b.isSharingLocation) return -1;
+              if (!a.isSharingLocation && b.isSharingLocation) return 1;
+              return a.contact.name.compareTo(b.contact.name);
+            });
+
+            return liveGuardians;
+          });
+    } catch (e) {
+      debugPrint('Error getting live guardians stream: $e');
+      return Stream.value([]);
     }
   }
 }

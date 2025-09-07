@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/emergency_invitation.dart';
+import '../models/user_model.dart';
 import '../services/invitation_service.dart';
 
 /// Screen for managing emergency contact invitations
@@ -16,15 +17,10 @@ class _InvitationScreenState extends State<InvitationScreen>
   final InvitationService _invitationService = InvitationService();
   late TabController _tabController;
 
-  List<EmergencyInvitation> _sentInvitations = [];
-  List<EmergencyInvitation> _receivedInvitations = [];
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _loadInvitations();
   }
 
   @override
@@ -33,72 +29,66 @@ class _InvitationScreenState extends State<InvitationScreen>
     super.dispose();
   }
 
-  Future<void> _loadInvitations() async {
-    setState(() => _isLoading = true);
-    
-    try {
-      final sent = await _invitationService.getSentInvitations();
-      final received = await _invitationService.getReceivedInvitations();
-      
-      setState(() {
-        _sentInvitations = sent;
-        _receivedInvitations = received;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading invitations: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _debugUserValidation() async {
-    // Debug current user
-    await _invitationService.debugCurrentUserDetails();
-    
-    // Test with a known email - replace with the email you're testing
-    const testEmail = 'anuradhashanukapanagoda0@gmail.com'; // Replace with actual email
-    final result = await _invitationService.testUserValidation(testEmail);
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('User validation test for $testEmail: $result'),
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Emergency Invitations'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bug_report),
-            tooltip: 'Debug User Validation',
-            onPressed: _debugUserValidation,
-          ),
-        ],
+        actions: [],
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
           tabs: [
             Tab(
-              icon: const Icon(Icons.send),
-              text: 'Send Invite',
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.send, size: 18),
+                  SizedBox(width: 4),
+                  Text('Send', style: TextStyle(fontSize: 12)),
+                ],
+              ),
             ),
             Tab(
-              icon: const Icon(Icons.inbox),
-              text: 'Received (${_receivedInvitations.length})',
+              child: StreamBuilder<List<EmergencyInvitation>>(
+                stream: _invitationService.getReceivedInvitationsStream(),
+                builder: (context, snapshot) {
+                  final count = snapshot.data?.length ?? 0;
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.inbox, size: 18),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Inbox ($count)',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
             Tab(
-              icon: const Icon(Icons.outbox),
-              text: 'Sent (${_sentInvitations.length})',
+              child: StreamBuilder<List<EmergencyInvitation>>(
+                stream: _invitationService.getSentInvitationsStream(),
+                builder: (context, snapshot) {
+                  final count = snapshot.data?.length ?? 0;
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.outbox, size: 18),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Sent ($count)',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -130,8 +120,10 @@ class _InvitationScreenState extends State<InvitationScreen>
                     children: [
                       Icon(Icons.info_outline, color: Colors.blue),
                       SizedBox(width: 8),
-                      Text('About Emergency Contacts', 
-                           style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        'About Emergency Contacts',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ],
                   ),
                   SizedBox(height: 8),
@@ -171,72 +163,138 @@ class _InvitationScreenState extends State<InvitationScreen>
   }
 
   Widget _buildReceivedInvitationsTab() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    return StreamBuilder<List<EmergencyInvitation>>(
+      stream: _invitationService.getReceivedInvitationsStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    if (_receivedInvitations.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.inbox, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text('No pending invitations', 
-                 style: TextStyle(fontSize: 18, color: Colors.grey)),
-            SizedBox(height: 8),
-            Text('When someone invites you as their emergency contact,\nit will appear here.',
-                 textAlign: TextAlign.center),
-          ],
-        ),
-      );
-    }
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text('Error loading invitations: ${snapshot.error}'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {}); // Triggers rebuild and reconnection
+                  },
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
+        }
 
-    return RefreshIndicator(
-      onRefresh: _loadInvitations,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _receivedInvitations.length,
-        itemBuilder: (context, index) {
-          final invitation = _receivedInvitations[index];
-          return _buildReceivedInvitationCard(invitation);
-        },
-      ),
+        final receivedInvitations = snapshot.data ?? [];
+
+        if (receivedInvitations.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.inbox, size: 64, color: Colors.grey),
+                SizedBox(height: 16),
+                Text(
+                  'No pending invitations',
+                  style: TextStyle(fontSize: 18, color: Colors.grey),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'When someone invites you as their emergency contact,\nit will appear here.',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            setState(() {}); // Triggers rebuild and reconnection
+          },
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: receivedInvitations.length,
+            itemBuilder: (context, index) {
+              final invitation = receivedInvitations[index];
+              return _buildReceivedInvitationCard(invitation);
+            },
+          ),
+        );
+      },
     );
   }
 
   Widget _buildSentInvitationsTab() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    return StreamBuilder<List<EmergencyInvitation>>(
+      stream: _invitationService.getSentInvitationsStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    if (_sentInvitations.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.outbox, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text('No invitations sent', 
-                 style: TextStyle(fontSize: 18, color: Colors.grey)),
-            SizedBox(height: 8),
-            Text('Send invitations to friends and family\nto add them as emergency contacts.',
-                 textAlign: TextAlign.center),
-          ],
-        ),
-      );
-    }
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text('Error loading invitations: ${snapshot.error}'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {}); // Triggers rebuild and reconnection
+                  },
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
+        }
 
-    return RefreshIndicator(
-      onRefresh: _loadInvitations,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _sentInvitations.length,
-        itemBuilder: (context, index) {
-          final invitation = _sentInvitations[index];
-          return _buildSentInvitationCard(invitation);
-        },
-      ),
+        final sentInvitations = snapshot.data ?? [];
+
+        if (sentInvitations.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.outbox, size: 64, color: Colors.grey),
+                SizedBox(height: 16),
+                Text(
+                  'No invitations sent',
+                  style: TextStyle(fontSize: 18, color: Colors.grey),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Send invitations to friends and family\nto add them as emergency contacts.',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            setState(() {}); // Triggers rebuild and reconnection
+          },
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: sentInvitations.length,
+            itemBuilder: (context, index) {
+              final invitation = sentInvitations[index];
+              return _buildSentInvitationCard(invitation);
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -368,9 +426,9 @@ class _InvitationScreenState extends State<InvitationScreen>
               children: [
                 CircleAvatar(
                   backgroundColor: Colors.grey[300],
-                  child: invitation.recipientEmail.isNotEmpty 
-                    ? Text(invitation.recipientEmail[0].toUpperCase())
-                    : const Icon(Icons.person),
+                  child: invitation.recipientEmail.isNotEmpty
+                      ? Text(invitation.recipientEmail[0].toUpperCase())
+                      : const Icon(Icons.person),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -391,7 +449,10 @@ class _InvitationScreenState extends State<InvitationScreen>
                 Column(
                   children: [
                     Icon(statusIcon, color: statusColor, size: 20),
-                    Text(statusText, style: TextStyle(color: statusColor, fontSize: 12)),
+                    Text(
+                      statusText,
+                      style: TextStyle(color: statusColor, fontSize: 12),
+                    ),
                   ],
                 ),
               ],
@@ -444,96 +505,224 @@ class _InvitationScreenState extends State<InvitationScreen>
 
   void _showSendInviteDialog() {
     final formKey = GlobalKey<FormState>();
-    final emailController = TextEditingController();
+    final usernameController = TextEditingController();
     final messageController = TextEditingController();
     String selectedRelationship = 'Contact';
 
+    List<UserModel> searchResults = [];
+    UserModel? selectedUser;
+    bool isSearching = false;
+
     final relationships = [
-      'Contact', 'Friend', 'Family', 'Spouse', 'Parent', 'Child', 'Sibling',
-      'Colleague', 'Neighbor', 'Partner', 'Other'
+      'Contact',
+      'Friend',
+      'Family',
+      'Spouse',
+      'Parent',
+      'Child',
+      'Sibling',
+      'Colleague',
+      'Neighbor',
+      'Partner',
+      'Other',
     ];
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Send Emergency Contact Invitation'),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email Address *',
-                    hintText: 'Enter their email address',
-                    prefixIcon: Icon(Icons.email),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Send Emergency Contact Invitation'),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Username search field
+                  TextFormField(
+                    controller: usernameController,
+                    decoration: InputDecoration(
+                      labelText: 'Username *',
+                      hintText: 'Search by username',
+                      prefixIcon: const Icon(Icons.alternate_email),
+                      suffix: isSearching
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : null,
+                    ),
+                    validator: (value) {
+                      if (value?.trim().isEmpty ?? true) {
+                        return 'Username is required';
+                      }
+                      if (selectedUser == null) {
+                        return 'Please select a user from search results';
+                      }
+                      return null;
+                    },
+                    onChanged: (value) async {
+                      if (value.length >= 2) {
+                        setState(() {
+                          isSearching = true;
+                          selectedUser = null;
+                        });
+
+                        final results = await _invitationService
+                            .searchUserByUsername(value);
+                        setState(() {
+                          searchResults = results;
+                          isSearching = false;
+                        });
+                      } else {
+                        setState(() {
+                          searchResults = [];
+                          selectedUser = null;
+                        });
+                      }
+                    },
                   ),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value?.trim().isEmpty ?? true) {
-                      return 'Email is required';
-                    }
-                    if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value!)) {
-                      return 'Enter a valid email address';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: selectedRelationship,
-                  decoration: const InputDecoration(
-                    labelText: 'Relationship (Optional)',
-                    prefixIcon: Icon(Icons.people),
+
+                  // Search results
+                  if (searchResults.isNotEmpty && selectedUser == null) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 200),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: searchResults
+                              .map(
+                                (user) => ListTile(
+                                  leading: CircleAvatar(
+                                    child: Text(
+                                      user.firstName[0].toUpperCase(),
+                                    ),
+                                  ),
+                                  title: Text(user.displayName),
+                                  subtitle: Text('@${user.username}'),
+                                  onTap: () {
+                                    setState(() {
+                                      selectedUser = user;
+                                      usernameController.text = user.username;
+                                      searchResults = [];
+                                    });
+                                  },
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // Selected user display
+                  if (selectedUser != null) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        border: Border.all(color: Colors.green.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            child: Text(
+                              selectedUser!.firstName[0].toUpperCase(),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  selectedUser!.displayName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text('@${selectedUser!.username}'),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              setState(() {
+                                selectedUser = null;
+                                usernameController.clear();
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: selectedRelationship,
+                    decoration: const InputDecoration(
+                      labelText: 'Relationship (Optional)',
+                      prefixIcon: Icon(Icons.people),
+                    ),
+                    items: relationships.map((relationship) {
+                      return DropdownMenuItem(
+                        value: relationship,
+                        child: Text(relationship),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      selectedRelationship = value!;
+                    },
                   ),
-                  items: relationships.map((relationship) {
-                    return DropdownMenuItem(
-                      value: relationship,
-                      child: Text(relationship),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    selectedRelationship = value!;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: messageController,
-                  decoration: const InputDecoration(
-                    labelText: 'Personal Message (Optional)',
-                    hintText: 'Add a personal note...',
-                    prefixIcon: Icon(Icons.message),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: messageController,
+                    decoration: const InputDecoration(
+                      labelText: 'Personal Message (Optional)',
+                      hintText: 'Add a personal note...',
+                      prefixIcon: Icon(Icons.message),
+                    ),
+                    maxLines: 3,
+                    maxLength: 200,
                   ),
-                  maxLines: 3,
-                  maxLength: 200,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: selectedUser == null
+                  ? null
+                  : () async {
+                      if (formKey.currentState!.validate()) {
+                        Navigator.of(context).pop();
+                        await _sendInvitationByUsername(
+                          selectedUser!.username,
+                          selectedRelationship,
+                          messageController.text.trim().isEmpty
+                              ? null
+                              : messageController.text.trim(),
+                        );
+                      }
+                    },
+              child: const Text('Send Invitation'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                Navigator.of(context).pop();
-                await _sendInvitation(
-                  emailController.text.trim(),
-                  selectedRelationship,
-                  messageController.text.trim().isEmpty 
-                    ? null 
-                    : messageController.text.trim(),
-                );
-              }
-            },
-            child: const Text('Send Invitation'),
-          ),
-        ],
       ),
     );
   }
@@ -581,7 +770,11 @@ class _InvitationScreenState extends State<InvitationScreen>
     );
   }
 
-  Future<void> _sendInvitation(String email, String relationship, String? message) async {
+  Future<void> _sendInvitationByUsername(
+    String username,
+    String relationship,
+    String? message,
+  ) async {
     try {
       showDialog(
         context: context,
@@ -597,8 +790,8 @@ class _InvitationScreenState extends State<InvitationScreen>
         ),
       );
 
-      await _invitationService.sendInvitation(
-        recipientEmail: email,
+      await _invitationService.sendInvitationByUsername(
+        recipientUsername: username,
         relationship: relationship,
         personalMessage: message,
       );
@@ -607,18 +800,20 @@ class _InvitationScreenState extends State<InvitationScreen>
         Navigator.of(context).pop(); // Close loading dialog
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Invitation sent! The recipient can accept it in their app.'),
+            content: Text(
+              'Invitation sent! The recipient can accept it in their app.',
+            ),
             backgroundColor: Colors.green,
           ),
         );
-        _loadInvitations();
+        // Streams will automatically update
       }
     } catch (e) {
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error sending invitation: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error sending invitation: $e')));
       }
     }
   }
@@ -626,7 +821,7 @@ class _InvitationScreenState extends State<InvitationScreen>
   Future<void> _acceptInvitation(EmergencyInvitation invitation) async {
     try {
       await _invitationService.acceptInvitation(invitation.inviteCode);
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -634,7 +829,6 @@ class _InvitationScreenState extends State<InvitationScreen>
             backgroundColor: Colors.green,
           ),
         );
-        _loadInvitations();
       }
     } catch (e) {
       if (mounted) {
@@ -648,7 +842,7 @@ class _InvitationScreenState extends State<InvitationScreen>
   Future<void> _acceptInvitationByCode(String code) async {
     try {
       await _invitationService.acceptInvitation(code);
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -656,40 +850,20 @@ class _InvitationScreenState extends State<InvitationScreen>
             backgroundColor: Colors.green,
           ),
         );
-        _loadInvitations();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _declineInvitation(EmergencyInvitation invitation) async {
-    try {
-      await _invitationService.declineInvitation(invitation.id);
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invitation declined')),
-        );
-        _loadInvitations();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error declining invitation: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
 
   Future<void> _ignoreInvitation(EmergencyInvitation invitation) async {
     try {
-      await _invitationService.ignoreInvitation(invitation.id);
-      
+      await _invitationService.declineInvitation(invitation.id);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -697,7 +871,6 @@ class _InvitationScreenState extends State<InvitationScreen>
             backgroundColor: Colors.grey,
           ),
         );
-        _loadInvitations();
       }
     } catch (e) {
       if (mounted) {
@@ -710,16 +883,14 @@ class _InvitationScreenState extends State<InvitationScreen>
 
   Future<void> _resendInvitation(EmergencyInvitation invitation) async {
     try {
-      await _invitationService.resendInvitation(invitation.id);
-      
+      // TODO: Implement resend functionality
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Invitation refreshed! Extended expiry date.'),
-            backgroundColor: Colors.green,
+            content: Text('Resend functionality coming soon'),
+            backgroundColor: Colors.orange,
           ),
         );
-        _loadInvitations();
       }
     } catch (e) {
       if (mounted) {
@@ -733,12 +904,11 @@ class _InvitationScreenState extends State<InvitationScreen>
   Future<void> _cancelInvitation(EmergencyInvitation invitation) async {
     try {
       await _invitationService.cancelInvitation(invitation.id);
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invitation cancelled')),
-        );
-        _loadInvitations();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Invitation cancelled')));
       }
     } catch (e) {
       if (mounted) {

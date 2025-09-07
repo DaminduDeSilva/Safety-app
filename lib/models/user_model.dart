@@ -9,11 +9,17 @@ class UserModel {
   /// User's email address
   final String email;
 
-  /// Optional display name for the user
-  final String? displayName;
+  /// Unique username for the user
+  final String username;
 
-  /// Optional phone number for the user
-  final String? phoneNumber;
+  /// User's first name
+  final String firstName;
+
+  /// User's last name
+  final String lastName;
+
+  /// User's phone number
+  final String phoneNumber;
 
   /// Optional profile photo URL
   final String? photoURL;
@@ -21,15 +27,24 @@ class UserModel {
   /// Timestamp when the user account was created
   final DateTime createdAt;
 
+  /// Timestamp when the profile was last updated
+  final DateTime updatedAt;
+
   /// Creates a new [UserModel] instance.
   const UserModel({
     required this.uid,
     required this.email,
-    this.displayName,
-    this.phoneNumber,
+    required this.username,
+    required this.firstName,
+    required this.lastName,
+    required this.phoneNumber,
     this.photoURL,
     required this.createdAt,
+    required this.updatedAt,
   });
+
+  /// Gets the full display name (first name + last name)
+  String get displayName => '$firstName $lastName';
 
   /// Creates a [UserModel] from a Firestore document map.
   ///
@@ -39,10 +54,13 @@ class UserModel {
     return UserModel(
       uid: uid,
       email: map['email'] as String,
-      displayName: map['displayName'] as String?,
-      phoneNumber: map['phoneNumber'] as String?,
+      username: map['username'] as String,
+      firstName: map['firstName'] as String,
+      lastName: map['lastName'] as String,
+      phoneNumber: map['phoneNumber'] as String,
       photoURL: map['photoURL'] as String?,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] as int),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] as int),
     );
   }
 
@@ -52,10 +70,13 @@ class UserModel {
   Map<String, dynamic> toMap() {
     return {
       'email': email,
-      'displayName': displayName,
+      'username': username,
+      'firstName': firstName,
+      'lastName': lastName,
       'phoneNumber': phoneNumber,
       'photoURL': photoURL,
       'createdAt': createdAt.millisecondsSinceEpoch,
+      'updatedAt': updatedAt.millisecondsSinceEpoch,
     };
   }
 
@@ -63,24 +84,30 @@ class UserModel {
   UserModel copyWith({
     String? uid,
     String? email,
-    String? displayName,
+    String? username,
+    String? firstName,
+    String? lastName,
     String? phoneNumber,
     String? photoURL,
     DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
       email: email ?? this.email,
-      displayName: displayName ?? this.displayName,
+      username: username ?? this.username,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       photoURL: photoURL ?? this.photoURL,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
   @override
   String toString() {
-    return 'UserModel(uid: $uid, email: $email, displayName: $displayName, phoneNumber: $phoneNumber, photoURL: $photoURL, createdAt: $createdAt)';
+    return 'UserModel(uid: $uid, email: $email, username: $username, firstName: $firstName, lastName: $lastName, phoneNumber: $phoneNumber, photoURL: $photoURL, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -89,19 +116,25 @@ class UserModel {
     return other is UserModel &&
         other.uid == uid &&
         other.email == email &&
-        other.displayName == displayName &&
+        other.username == username &&
+        other.firstName == firstName &&
+        other.lastName == lastName &&
         other.phoneNumber == phoneNumber &&
         other.photoURL == photoURL &&
-        other.createdAt == createdAt;
+        other.createdAt == createdAt &&
+        other.updatedAt == updatedAt;
   }
 
   @override
   int get hashCode {
     return uid.hashCode ^
         email.hashCode ^
-        displayName.hashCode ^
+        username.hashCode ^
+        firstName.hashCode ^
+        lastName.hashCode ^
         phoneNumber.hashCode ^
         photoURL.hashCode ^
-        createdAt.hashCode;
+        createdAt.hashCode ^
+        updatedAt.hashCode;
   }
 }

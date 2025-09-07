@@ -3,7 +3,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'screens/sign_in_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_navigation_screen.dart';
+import 'screens/profile_setup_screen.dart';
+import 'services/database_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,8 +37,15 @@ class SafetyApp extends StatelessWidget {
   }
 }
 
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  final DatabaseService _databaseService = DatabaseService();
 
   @override
   Widget build(BuildContext context) {
@@ -50,8 +59,25 @@ class AuthWrapper extends StatelessWidget {
         }
 
         if (snapshot.hasData) {
-          // User is signed in, show home page
-          return const HomeScreen();
+          // User is signed in, check if profile is complete
+          return FutureBuilder<bool>(
+            future: _databaseService.isProfileComplete(snapshot.data!.uid),
+            builder: (context, profileSnapshot) {
+              if (profileSnapshot.connectionState == ConnectionState.waiting) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              if (profileSnapshot.data == true) {
+                // Profile is complete, show main navigation
+                return const MainNavigationScreen();
+              } else {
+                // Profile is not complete, show profile setup screen
+                return const ProfileSetupScreen();
+              }
+            },
+          );
         } else {
           // User is not signed in, show sign in page
           return const SignInPage();
