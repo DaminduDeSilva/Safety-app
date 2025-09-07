@@ -1,0 +1,551 @@
+import 'dart:math';
+import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/emergency_invitation.dart';
+import '../models/emergency_contact.dart';
+import 'database_service.dart';
+
+/// Service for managing emergency contact invitations
+/// 
+/// Handles in-app invitations, managing invitation status,
+/// and processing invitation responses.
+class InvitationService {
+  static final InvitationService _instance = InvitationService._internal();
+  factory InvitationService() => _instance;
+  InvitationService._internal();
+
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final DatabaseService _databaseService = DatabaseService();
+
+  /// Sends an emergency contact invitation (in-app only)
+  Future<String> sendInvitation({
+    required String recipientEmail,
+    required String relationship,
+    String? personalMessage,
+  }) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Validate recipient email format
+      final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+      if (!emailRegex.hasMatch(recipientEmail)) {
+        throw Exception('Invalid email format');
+      }
+
+      // Debug current user details
+      await debugCurrentUserDetails();
+      
+      // Check if recipient is a registered user
+      debugPrint('Checking if user exists: $recipientEmail');
+      final isRegisteredUser = await _checkUserExists(recipientEmail);
+      debugPrint('User exists result: $isRegisteredUser');
+      
+      if (!isRegisteredUser) {
+        throw Exception('The recipient is not a registered user of the Safety App. Please ask them to create an account first.');
+      }
+
+      // Check if invitation already exists
+      final existingInvitation = await _checkExistingInvitation(
+        currentUser.uid, 
+        recipientEmail.toLowerCase().trim()
+      );
+      if (existingInvitation != null) {
+        throw Exception('An invitation has already been sent to this user');
+      }
+
+      // Generate unique invitation code
+      final inviteCode = _generateInviteCode();
+      final now = DateTime.now();
+      final expiresAt = now.add(const Duration(days: 7)); // 7 days expiry
+
+      // Get sender name from user profile or email
+      final senderName = currentUser.displayName ?? 
+                        (currentUser.email?.split('@').first ?? 'Unknown User');
+
+      // Create invitation object
+      final invitation = EmergencyInvitation(
+        id: '', // Will be set by Firestore
+        senderUserId: currentUser.uid,
+        senderName: senderName,
+        senderEmail: currentUser.email ?? '',
+        recipientEmail: recipientEmail.toLowerCase().trim(),
+        recipientName: '', // Will be filled when user accepts
+        relationship: relationship,
+        sentAt: now,
+        expiresAt: expiresAt,
+        message: personalMessage?.trim(),
+        inviteCode: inviteCode,
+      );
+
+      // Store invitation in Firestore
+      final docRef = await _firestore.collection('invitations').add(invitation.toMap());
+      final invitationId = docRef.id;
+
+      debugPrint('Invitation created successfully: $invitationId');
+      debugPrint('Invitation code: $inviteCode');
+      
+      return invitationId;
+    } catch (e) {
+      debugPrint('Error sending invitation: $e');
+      rethrow;
+    }
+  }
+
+  /// Gets all invitations sent by the current user
+  Future<List<EmergencyInvitation>> getSentInvitations() async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) return [];
+
+      final querySnapshot = await _firestore
+          .collection('invitations')
+          .where('senderUserId', isEqualTo: currentUser.uid)
+          .orderBy('sentAt', descending: true)
+          .get();
+
+      return querySnapshot.docs
+          .map((doc) => EmergencyInvitation.fromMap(doc.data(), doc.id))
+          .toList();
+    } catch (e) {
+      debugPrint('Error getting sent invitations: $e');
+      return [];
+    }
+  }
+
+  /// Gets all invitations received by the current user
+  Future<List<EmergencyInvitation>> getReceivedInvitations() async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null || currentUser.email == null) return [];
+
+      final querySnapshot = await _firestore
+          .collection('invitations')
+          .where('recipientEmail', isEqualTo: currentUser.email!.toLowerCase())
+          .where('status', isEqualTo: 'pending')
+          .orderBy('sentAt', descending: true)
+          .get();
+
+      return querySnapshot.docs
+          .map((doc) => EmergencyInvitation.fromMap(doc.data(), doc.id))
+          .where((invitation) => !invitation.isExpired)
+          .toList();
+    } catch (e) {
+      debugPrint('Error getting received invitations: $e');
+      return [];
+    }
+  }
+
+  /// Accepts an invitation by invite code
+  Future<void> acceptInvitation(String inviteCode) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Find invitation by code
+      final querySnapshot = await _firestore
+          .collection('invitations')
+          .where('inviteCode', isEqualTo: inviteCode.toUpperCase())
+          .where('status', isEqualTo: 'pending')
+          .limit(1)
+          .get();
+
+      if (querySnapshot.docs.isEmpty) {
+        throw Exception('Invalid or expired invitation code');
+      }
+
+      final invitationDoc = querySnapshot.docs.first;
+      final invitation = EmergencyInvitation.fromMap(invitationDoc.data(), invitationDoc.id);
+
+      if (invitation.isExpired) {
+        throw Exception('Invitation has expired');
+      }
+
+      // Verify recipient email matches current user
+      if (invitation.recipientEmail.toLowerCase() != currentUser.email?.toLowerCase()) {
+        throw Exception('This invitation is not for your email address');
+      }
+
+      // Validate that sender is still a registered user
+      final senderExists = await validateSender(invitation.senderUserId);
+      if (!senderExists) {
+        throw Exception('The sender is no longer a registered user');
+      }
+
+      // Get recipient name from current user
+      final recipientName = currentUser.displayName ?? 
+                           (currentUser.email?.split('@').first ?? 'Unknown User');
+
+      // Add sender as emergency contact for recipient
+      final emergencyContact = EmergencyContact(
+        id: invitation.senderUserId,
+        name: invitation.senderName,
+        phoneNumber: '', // We'll need to get this from user profile
+        relationship: invitation.relationship,
+        isPrimary: false,
+      );
+
+      await _databaseService.addEmergencyContact(emergencyContact);
+
+      // Update invitation status and set recipient name
+      await invitationDoc.reference.update({
+        'status': 'accepted',
+        'respondedAt': FieldValue.serverTimestamp(),
+        'recipientName': recipientName,
+      });
+
+      // Add current user as emergency contact for sender (mutual relationship)
+      await _addMutualEmergencyContact(invitation, recipientName);
+
+      debugPrint('Invitation accepted successfully - mutual contacts created');
+    } catch (e) {
+      debugPrint('Error accepting invitation: $e');
+      rethrow;
+    }
+  }
+
+  /// Declines an invitation
+  Future<void> declineInvitation(String invitationId) async {
+    try {
+      await _firestore.collection('invitations').doc(invitationId).update({
+        'status': 'declined',
+        'respondedAt': FieldValue.serverTimestamp(),
+      });
+
+      debugPrint('Invitation declined successfully');
+    } catch (e) {
+      debugPrint('Error declining invitation: $e');
+      rethrow;
+    }
+  }
+
+  /// Ignores an invitation (removes it from received list without notification to sender)
+  Future<void> ignoreInvitation(String invitationId) async {
+    try {
+      await _firestore.collection('invitations').doc(invitationId).update({
+        'status': 'ignored',
+        'respondedAt': FieldValue.serverTimestamp(),
+      });
+
+      debugPrint('Invitation ignored successfully');
+    } catch (e) {
+      debugPrint('Error ignoring invitation: $e');
+      rethrow;
+    }
+  }
+
+  /// Cancels a sent invitation
+  Future<void> cancelInvitation(String invitationId) async {
+    try {
+      await _firestore.collection('invitations').doc(invitationId).update({
+        'status': 'cancelled',
+        'respondedAt': FieldValue.serverTimestamp(),
+      });
+
+      debugPrint('Invitation cancelled successfully');
+    } catch (e) {
+      debugPrint('Error cancelling invitation: $e');
+      rethrow;
+    }
+  }
+
+  /// Resends an invitation (extends expiry date)
+  Future<void> resendInvitation(String invitationId) async {
+    try {
+      final doc = await _firestore.collection('invitations').doc(invitationId).get();
+      if (!doc.exists) {
+        throw Exception('Invitation not found');
+      }
+
+      final invitation = EmergencyInvitation.fromMap(doc.data()!, doc.id);
+      
+      // Create new expiry date
+      final newExpiresAt = DateTime.now().add(const Duration(days: 7));
+      
+      // Update invitation
+      await doc.reference.update({
+        'expiresAt': Timestamp.fromDate(newExpiresAt),
+        'sentAt': FieldValue.serverTimestamp(),
+      });
+
+      debugPrint('Invitation resent successfully - new expiry: $newExpiresAt');
+    } catch (e) {
+      debugPrint('Error resending invitation: $e');
+      rethrow;
+    }
+  }
+
+  /// Generates a unique 8-character invitation code
+  String _generateInviteCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final random = Random();
+    return String.fromCharCodes(
+      Iterable.generate(8, (_) => chars.codeUnitAt(random.nextInt(chars.length))),
+    );
+  }
+
+  /// Adds mutual emergency contact relationship
+  Future<void> _addMutualEmergencyContact(EmergencyInvitation invitation, String recipientName) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) return;
+
+      // Get current user's profile information
+      final userProfile = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+
+      String userName = recipientName;
+      String userPhone = '';
+
+      if (userProfile.exists) {
+        final data = userProfile.data()!;
+        userName = data['name'] ?? recipientName;
+        userPhone = data['phoneNumber'] ?? userPhone;
+      }
+
+      // Create emergency contact for the sender
+      final mutualContact = EmergencyContact(
+        id: currentUser.uid,
+        name: userName,
+        phoneNumber: userPhone,
+        relationship: _getReciprocalRelationship(invitation.relationship),
+        isPrimary: false,
+      );
+
+      // Add to sender's emergency contacts
+      await _firestore
+          .collection('users')
+          .doc(invitation.senderUserId)
+          .collection('emergencyContacts')
+          .doc(currentUser.uid)
+          .set(mutualContact.toMap());
+
+      debugPrint('Mutual emergency contact added successfully');
+    } catch (e) {
+      debugPrint('Error adding mutual emergency contact: $e');
+    }
+  }
+
+  /// Gets the reciprocal relationship
+  String _getReciprocalRelationship(String relationship) {
+    switch (relationship.toLowerCase()) {
+      case 'parent':
+        return 'Child';
+      case 'child':
+        return 'Parent';
+      case 'spouse':
+      case 'husband':
+      case 'wife':
+        return 'Spouse';
+      case 'sibling':
+      case 'brother':
+      case 'sister':
+        return 'Sibling';
+      case 'friend':
+        return 'Friend';
+      case 'colleague':
+        return 'Colleague';
+      case 'neighbor':
+        return 'Neighbor';
+      default:
+        return 'Contact';
+    }
+  }
+
+  /// Cleans up expired invitations
+  Future<void> cleanupExpiredInvitations() async {
+    try {
+      final expiredQuery = await _firestore
+          .collection('invitations')
+          .where('expiresAt', isLessThan: Timestamp.now())
+          .where('status', isEqualTo: 'pending')
+          .get();
+
+      final batch = _firestore.batch();
+      for (final doc in expiredQuery.docs) {
+        batch.update(doc.reference, {'status': 'expired'});
+      }
+
+      await batch.commit();
+      debugPrint('Cleaned up ${expiredQuery.docs.length} expired invitations');
+    } catch (e) {
+      debugPrint('Error cleaning up expired invitations: $e');
+    }
+  }
+
+  /// Checks if a user exists with the given email in Firebase Authentication
+//   Future<bool> _checkUserExists(String email) async {
+//     try {
+//       final cleanEmail = email.toLowerCase().trim();
+      
+//       // Method 1: Try to fetch sign-in methods (primary check)
+//       try {
+//         final signInMethods = await _auth.fetchSignInMethodsForEmail(cleanEmail);
+//         if (signInMethods.isNotEmpty) {
+//           debugPrint('User found via fetchSignInMethodsForEmail: $cleanEmail');
+//           return true;
+//         }
+//       } catch (authError) {
+//         debugPrint('fetchSignInMethodsForEmail failed: $authError');
+//       }
+      
+//       // Method 2: Check Firestore users collection as fallback
+//       try {
+//         final querySnapshot = await _firestore
+//             .collection('users')
+//             .where('email', isEqualTo: cleanEmail)
+//             .limit(1)
+//             .get();
+        
+//         if (querySnapshot.docs.isNotEmpty) {
+//           debugPrint('User found in Firestore users collection: $cleanEmail');
+//           return true;
+//         }
+//       } catch (firestoreError) {
+//         debugPrint('Firestore user check failed: $firestoreError');
+//       }
+      
+//       // Method 3: Check if email matches current user (for self-invitation prevention)
+//       final currentUser = _auth.currentUser;
+//       if (currentUser != null && currentUser.email?.toLowerCase() == cleanEmail) {
+//         debugPrint('Email matches current authenticated user: $cleanEmail');
+//         return true;
+//       }
+      
+//       debugPrint('User not found with email: $cleanEmail');
+//       return false;
+//     } catch (e) {
+//       debugPrint('Error checking user existence: $e');
+//       return false;
+//     }
+//   }
+// Future<bool> _checkUserExists(String email) async {
+//   try {
+//     debugPrint('Checking if user exists for email: $email');
+
+//     // Normalize email
+//     final normalizedEmail = email.toLowerCase().trim();
+
+//     // Fetch sign-in methods
+//     final signInMethods = await _auth.fetchSignInMethodsForEmail(normalizedEmail);
+
+//     debugPrint('Sign-in methods for $normalizedEmail: $signInMethods');
+
+//     // If list is not empty, user exists
+//     return signInMethods.isNotEmpty;
+//   } catch (e) {
+//     debugPrint('Error checking user existence: $e');
+//     return false; // safer to return false on unexpected errors
+//   }
+// }
+Future<bool> _checkUserExists(String email) async {
+  try {
+    final normalizedEmail = email.replaceAll(RegExp(r'\s+'), '').toLowerCase().trim();
+    debugPrint('Normalized email: $normalizedEmail');
+
+    final signInMethods = await _auth.fetchSignInMethodsForEmail(normalizedEmail);
+
+    debugPrint('Sign-in methods for $normalizedEmail: $signInMethods');
+
+    return signInMethods.isNotEmpty;
+  } catch (e) {
+    debugPrint('Error checking user existence: $e');
+    return false;
+  }
+}
+
+
+  /// Checks if an invitation already exists between sender and recipient
+  Future<EmergencyInvitation?> _checkExistingInvitation(String senderUserId, String recipientEmail) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('invitations')
+          .where('senderUserId', isEqualTo: senderUserId)
+          .where('recipientEmail', isEqualTo: recipientEmail.toLowerCase().trim())
+          .where('status', whereIn: ['pending', 'accepted'])
+          .limit(1)
+          .get();
+      
+      if (querySnapshot.docs.isNotEmpty) {
+        return EmergencyInvitation.fromMap(
+          querySnapshot.docs.first.data(),
+          querySnapshot.docs.first.id,
+        );
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error checking existing invitation: $e');
+      return null;
+    }
+  }
+
+  /// Validates that the sender is a registered user (for received invitations)
+  Future<bool> validateSender(String senderUserId) async {
+    try {
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(senderUserId)
+          .get();
+      
+      return userDoc.exists;
+    } catch (e) {
+      debugPrint('Error validating sender: $e');
+      return false;
+    }
+  }
+
+  /// Debug method to check current user authentication details
+  Future<void> debugCurrentUserDetails() async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser != null) {
+        debugPrint('=== Current User Debug Info ===');
+        debugPrint('UID: ${currentUser.uid}');
+        debugPrint('Email: ${currentUser.email}');
+        debugPrint('Display Name: ${currentUser.displayName}');
+        debugPrint('Email Verified: ${currentUser.emailVerified}');
+        debugPrint('Is Anonymous: ${currentUser.isAnonymous}');
+        
+        // Check if user document exists in Firestore
+        final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+        debugPrint('User document exists in Firestore: ${userDoc.exists}');
+        if (userDoc.exists) {
+          debugPrint('User document data: ${userDoc.data()}');
+        }
+        
+        // Test fetchSignInMethodsForEmail with current user's email
+        if (currentUser.email != null) {
+          try {
+            final signInMethods = await _auth.fetchSignInMethodsForEmail(currentUser.email!);
+            debugPrint('Sign-in methods for current user: $signInMethods');
+          } catch (e) {
+            debugPrint('Error fetching sign-in methods for current user: $e');
+          }
+        }
+        debugPrint('=== End Debug Info ===');
+      } else {
+        debugPrint('No current user authenticated');
+      }
+    } catch (e) {
+      debugPrint('Error in debugCurrentUserDetails: $e');
+    }
+  }
+
+  /// Test method to validate a specific email
+  Future<bool> testUserValidation(String email) async {
+    debugPrint('=== Testing User Validation for: $email ===');
+    await debugCurrentUserDetails();
+    final result = await _checkUserExists(email);
+    debugPrint('Validation result for $email: $result');
+    debugPrint('=== End Test ===');
+    return result;
+  }
+}

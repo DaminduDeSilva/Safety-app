@@ -4,6 +4,7 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/emergency_contact.dart';
 import '../services/database_service.dart';
+import 'invitation_screen.dart';
 
 /// Screen for managing emergency contacts.
 ///
@@ -541,6 +542,17 @@ class _ContactsScreenState extends State<ContactsScreen> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
           IconButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const InvitationScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.mail_outline),
+            tooltip: 'Manage Invitations',
+          ),
+          IconButton(
             onPressed: _importContactsFromPhone,
             icon: const Icon(Icons.contact_phone),
             tooltip: 'Import from Phone',
@@ -609,7 +621,19 @@ class _ContactsScreenState extends State<ContactsScreen> {
                   ElevatedButton.icon(
                     onPressed: _showAddContactDialog,
                     icon: const Icon(Icons.add),
-                    label: const Text('Add Your First Contact'),
+                    label: const Text('Add Contact Manually'),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => const InvitationScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.mail_outline),
+                    label: const Text('Send Invitation via Email'),
                   ),
                 ],
               ),

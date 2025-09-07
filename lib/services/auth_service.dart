@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
 class AuthService {
@@ -17,6 +18,9 @@ class AuthService {
 
       if (credential.user != null) {
         debugPrint('Sign in successful for user: ${credential.user!.email}');
+        
+        // Ensure user document exists and update last login
+        await _createUserDocument(credential.user!);
       }
 
       return credential.user;
@@ -48,6 +52,9 @@ class AuthService {
         debugPrint(
           'Registration successful for user: ${credential.user!.email}',
         );
+
+        // Create user document in Firestore
+        await _createUserDocument(credential.user!);
       }
 
       return credential.user;
@@ -61,6 +68,40 @@ class AuthService {
       debugPrint('Unexpected error during registration: $e');
       // Re-throw the exception so the UI can handle error messages
       rethrow;
+    }
+  }
+
+  /// Creates a user document in Firestore
+  static Future<void> _createUserDocument(User user) async {
+    try {
+      final firestore = FirebaseFirestore.instance;
+      
+      // Check if document already exists
+      final userDoc = await firestore.collection('users').doc(user.uid).get();
+      
+      if (!userDoc.exists) {
+        await firestore.collection('users').doc(user.uid).set({
+          'uid': user.uid,
+          'email': user.email,
+          'name': user.displayName ?? user.email?.split('@').first ?? 'Unknown User',
+          'phoneNumber': user.phoneNumber ?? '',
+          'photoURL': user.photoURL ?? '',
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastLoginAt': FieldValue.serverTimestamp(),
+        });
+        
+        debugPrint('User document created in Firestore');
+      } else {
+        // Update last login time
+        await firestore.collection('users').doc(user.uid).update({
+          'lastLoginAt': FieldValue.serverTimestamp(),
+        });
+        
+        debugPrint('User document updated with last login time');
+      }
+    } catch (e) {
+      debugPrint('Error creating/updating user document: $e');
+      // Don't throw here as the auth was successful
     }
   }
 
