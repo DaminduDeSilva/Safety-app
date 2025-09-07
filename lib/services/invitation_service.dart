@@ -31,7 +31,7 @@ class InvitationService {
       final snapshot = await _firestore
           .collection('users')
           .where('username', isGreaterThanOrEqualTo: normalizedQuery)
-          .where('username', isLessThan: normalizedQuery + 'z')
+          .where('username', isLessThan: '${normalizedQuery}z')
           .limit(10)
           .get();
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/live_guardians_section.dart';
 import '../widgets/add_guardian_button.dart';
+import '../widgets/modern_app_bar.dart';
 import 'contacts_screen.dart';
 import 'invitation_screen.dart';
 
@@ -34,32 +35,53 @@ class _GuardiansScreenState extends State<GuardiansScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'My Guardians',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(icon: Icon(Icons.people), text: 'My Guardians'),
-            Tab(icon: Icon(Icons.mail_outline), text: 'Invitations'),
-            Tab(icon: Icon(Icons.person_add), text: 'Add Guardian'),
-          ],
-        ),
+      appBar: const ModernAppBar(
+        title: 'My Guardians',
+        automaticallyImplyLeading: false,
       ),
-      body: TabBarView(
-        controller: _tabController,
+      backgroundColor: Colors.grey[50],
+      body: Column(
         children: [
-          // Tab 1: My Emergency Contacts with Live Location
-          _buildMyGuardiansTab(),
+          // Modern Tab Bar
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: TabBar(
+              controller: _tabController,
+              labelColor: Colors.blue[700],
+              unselectedLabelColor: Colors.grey[600],
+              indicatorColor: Colors.blue[700],
+              indicatorWeight: 3,
+              tabs: const [
+                Tab(icon: Icon(Icons.people), text: 'My Guardians'),
+                Tab(icon: Icon(Icons.mail_outline), text: 'Invitations'),
+                Tab(icon: Icon(Icons.person_add), text: 'Add Guardian'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // Tab 1: My Emergency Contacts with Live Location
+                _buildMyGuardiansTab(),
 
-          // Tab 2: Invitations Management
-          _buildInvitationsTab(),
+                // Tab 2: Invitations Management
+                _buildInvitationsTab(),
 
-          // Tab 3: Add New Guardian
-          _buildAddGuardianTab(),
+                // Tab 3: Add New Guardian
+                _buildAddGuardianTab(),
+              ],
+            ),
+          ),
         ],
       ),
     );

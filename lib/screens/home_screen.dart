@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/database_service.dart';
 import '../services/location_service.dart';
+import '../services/fake_call_service.dart';
 import '../models/user_model.dart';
+import '../widgets/modern_app_bar.dart';
 import 'live_location_screen.dart';
 import 'report_unsafe_zone_screen.dart';
 import 'emergency_sos_screen.dart';
+import 'fake_call_config_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Clean and focused home dashboard for the safety app.
@@ -46,18 +49,60 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Triggers a quick fake call for emergency situations
+  Future<void> _triggerQuickFakeCall() async {
+    try {
+      // Create an emergency fake call configuration
+      final emergencyCall = FakeCallService.instance.createEmergencyFakeCall();
+
+      // Show a brief confirmation dialog
+      final shouldTrigger = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Quick Fake Call'),
+          content: Text(
+            'This will immediately trigger a fake call from "${emergencyCall.callerName}".\n\nProceed?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Start Call'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldTrigger == true) {
+        await FakeCallService.instance.triggerImmediateFakeCall(
+          context,
+          emergencyCall,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error triggering fake call: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to trigger fake call'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Safety Dashboard',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        automaticallyImplyLeading:
-            false, // Remove back button since we're using bottom nav
+      appBar: const ModernAppBar(
+        title: 'Safety Dashboard',
+        automaticallyImplyLeading: false,
       ),
+      backgroundColor: Colors.grey[50],
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -87,6 +132,16 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildRecentActivityCard(),
           ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _triggerQuickFakeCall,
+        backgroundColor: Colors.green[600],
+        icon: const Icon(Icons.phone_in_talk, color: Colors.white),
+        label: const Text(
+          'Quick Call',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        tooltip: 'Trigger emergency fake call',
       ),
     );
   }
@@ -247,6 +302,42 @@ class _HomeScreenState extends State<HomeScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => const ReportUnsafeZoneScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        // Second row with fake call features
+        Row(
+          children: [
+            Expanded(
+              child: _buildActionCard(
+                icon: Icons.phone_in_talk,
+                title: 'Quick Call',
+                subtitle: 'Emergency fake call',
+                color: Colors.green,
+                onTap: _triggerQuickFakeCall,
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: _buildActionCard(
+                icon: Icons.settings_phone,
+                title: 'Call Settings',
+                subtitle: 'Configure fake calls',
+                color: Colors.purple,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const FakeCallConfigScreen(),
                     ),
                   );
                 },

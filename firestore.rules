@@ -20,6 +20,11 @@ service cloud.firestore {
       match /enhanced_emergency_contacts/{contactId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
+      
+      // Fake call configurations subcollection
+      match /fake_call_configs/{configId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
     
     // Invitations collection

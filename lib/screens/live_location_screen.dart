@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../services/database_service.dart';
 import '../services/location_service.dart';
+import '../widgets/modern_app_bar.dart';
 
 /// Screen for users to start and manage their live location sharing session.
 ///
@@ -220,12 +221,8 @@ class _LiveLocationScreenState extends State<LiveLocationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Live Location Sharing'),
-        centerTitle: true,
-        backgroundColor: Theme.of(context).primaryColor,
-        foregroundColor: Colors.white,
-      ),
+      appBar: const ModernAppBar(title: 'Live Location Sharing'),
+      backgroundColor: Colors.grey[50],
       body: Column(
         children: [
           // Status Card
