@@ -125,8 +125,8 @@ flutter doctor
 #### 2. Clone Suraksha Repository
 
 ```bash
-git clone https://github.com/DaminduDeSilva/Safety-app.git
-cd Safety-app
+git clone https://github.com/DaminduDeSilva/SyntaxSquad_hackelite2.0.git
+cd SyntaxSquad_hackelite2.0
 ```
 
 #### 3. Install Dependencies
@@ -751,11 +751,11 @@ We welcome contributions from developers, safety advocates, and users who want t
 ```bash
 # Fork the repository on GitHub
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/Safety-app.git
-cd Safety-app
+git clone https://github.com/YOUR_USERNAME/SyntaxSquad_hackelite2.0.git
+cd SyntaxSquad_hackelite2.0
 
 # Add upstream remote
-git remote add upstream https://github.com/DaminduDeSilva/Safety-app.git
+git remote add upstream https://github.com/DaminduDeSilva/SyntaxSquad_hackelite2.0.git
 
 # Install dependencies
 flutter pub get
@@ -874,10 +874,10 @@ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 
 | Issue Type             | Contact Method                                                                 | Response Time  |
 | ---------------------- | ------------------------------------------------------------------------------ | -------------- |
-| 🐛 **Bug Reports**     | [GitHub Issues](https://github.com/DaminduDeSilva/Safety-app/issues)           | 24-48 hours    |
-| ❓ **Questions**       | [GitHub Discussions](https://github.com/DaminduDeSilva/Safety-app/discussions) | 1-3 days       |
+| 🐛 **Bug Reports**     | [GitHub Issues](https://github.com/DaminduDeSilva/SyntaxSquad_hackelite2.0/issues)           | 24-48 hours    |
+| ❓ **Questions**       | [GitHub Discussions](https://github.com/DaminduDeSilva/SyntaxSquad_hackelite2.0/discussions) | 1-3 days       |
 | 🔐 **Security Issues** | security@suraksha-app.com                                                      | 24 hours       |
-| 📚 **Documentation**   | [Wiki](https://github.com/DaminduDeSilva/Safety-app/wiki)                      | Always updated |
+| 📚 **Documentation**   | [Wiki](https://github.com/DaminduDeSilva/SyntaxSquad_hackelite2.0/wiki)                      | Always updated |
 
 ### 📋 Issue Reporting Template
 
@@ -909,7 +909,7 @@ If applicable, add screenshots
 
 Have an idea for improving Suraksha? We'd love to hear it!
 
-1. **Check existing requests** in [Discussions](https://github.com/DaminduDeSilva/Safety-app/discussions)
+1. **Check existing requests** in [Discussions](https://github.com/DaminduDeSilva/SyntaxSquad_hackelite2.0/discussions)
 2. **Create detailed proposal** with use case and benefits
 3. **Consider privacy implications** of your suggestion
 4. **Think about global applicability** across different cultures
@@ -988,7 +988,7 @@ Based on studies in:
 
 **Suraksha** - Empowering personal safety through innovative technology
 
-[⭐ Star this repository](https://github.com/DaminduDeSilva/Safety-app) | [🐛 Report Bug](https://github.com/DaminduDeSilva/Safety-app/issues) | [💡 Request Feature](https://github.com/DaminduDeSilva/Safety-app/discussions)
+[⭐ Star this repository](https://github.com/DaminduDeSilva/SyntaxSquad_hackelite2.0) | [🐛 Report Bug](https://github.com/DaminduDeSilva/SyntaxSquad_hackelite2.0/issues) | [💡 Request Feature](https://github.com/DaminduDeSilva/SyntaxSquad_hackelite2.0/discussions)
 
 **Made with 💙 by developers who care about safety**
 
