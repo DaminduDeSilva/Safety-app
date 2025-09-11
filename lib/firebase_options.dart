@@ -46,5 +46,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: '464394607461',
     projectId: 'safety-app-487c6',
     storageBucket: 'safety-app-487c6.firebasestorage.app',
+    databaseURL: 'https://safety-app-487c6-default-rtdb.firebaseio.com',
   );
 }

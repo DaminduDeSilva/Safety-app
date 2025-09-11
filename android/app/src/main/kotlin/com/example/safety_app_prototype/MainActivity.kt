@@ -19,11 +19,13 @@ class MainActivity : FlutterActivity() {
         private const val TAG = "MainActivity"
         private const val POWER_BUTTON_CHANNEL = "power_button_service"
         private const val SMS_CHANNEL = "com.safety.app/sms"
+        private const val NOTIFICATION_CHANNEL = "com.safety.app/notifications"
     }
     
     private var powerButtonService: PowerButtonService? = null
     private var methodChannel: MethodChannel? = null
     private var smsMethodChannel: MethodChannel? = null
+    private var notificationMethodChannel: MethodChannel? = null
     
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -75,6 +77,25 @@ class MainActivity : FlutterActivity() {
                     val message = call.argument<String>("message") ?: ""
                     val success = openSMSAppBulk(phoneNumbers, message)
                     result.success(success)
+                }
+                else -> {
+                    result.notImplemented()
+                }
+            }
+        }
+        
+        // Notification Service Channel
+        notificationMethodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NOTIFICATION_CHANNEL)
+        notificationMethodChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "startNotificationService" -> {
+                    val userId = call.argument<String>("userId")
+                    startNotificationService(userId)
+                    result.success(true)
+                }
+                "stopNotificationService" -> {
+                    stopNotificationService()
+                    result.success(true)
                 }
                 else -> {
                     result.notImplemented()
@@ -223,6 +244,29 @@ class MainActivity : FlutterActivity() {
             Log.d(TAG, "Power button service started")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start power button service", e)
+        }
+    }
+
+    private fun startNotificationService(userId: String?) {
+        try {
+            val serviceIntent = Intent(this, NotificationService::class.java)
+            userId?.let { serviceIntent.putExtra("userId", it) }
+            startForegroundService(serviceIntent)
+            
+            Log.d(TAG, "Notification service started with userId: $userId")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start notification service", e)
+        }
+    }
+
+    private fun stopNotificationService() {
+        try {
+            val serviceIntent = Intent(this, NotificationService::class.java)
+            stopService(serviceIntent)
+            
+            Log.d(TAG, "Notification service stopped")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to stop notification service", e)
         }
     }
     

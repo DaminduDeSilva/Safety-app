@@ -4,9 +4,13 @@ import '../services/database_service.dart';
 import '../services/location_service.dart';
 import '../services/fake_call_service.dart';
 import '../services/sms_service.dart';
+import '../services/realtime_notification_service.dart';
+import '../services/native_notification_service.dart';
+import '../services/permission_manager_service.dart';
 import '../models/user_model.dart';
 import '../models/fake_call_model.dart';
 import '../widgets/modern_app_bar.dart';
+import '../widgets/notification_alerts_section.dart';
 import 'live_location_screen.dart';
 import 'report_unsafe_zone_screen.dart';
 import 'emergency_sos_screen.dart';
@@ -26,6 +30,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final DatabaseService _databaseService = DatabaseService();
   final LocationService _locationService = LocationService();
+  final RealtimeNotificationService _realtimeNotificationService =
+      RealtimeNotificationService();
+  final PermissionManagerService _permissionManager =
+      PermissionManagerService();
   UserModel? _userProfile;
   bool _isSOSLoading = false;
 
@@ -33,6 +41,40 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadUserProfile();
+    _initializeNotificationServices();
+    _checkAndForceLocation();
+  }
+
+  /// Check and force location to be enabled
+  Future<void> _checkAndForceLocation() async {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final isLocationEnabled = await _permissionManager.isLocationEnabled();
+      if (!isLocationEnabled && mounted) {
+        await _permissionManager.forceLocationEnable(context);
+      }
+    });
+  }
+
+  /// Initialize notification services
+  Future<void> _initializeNotificationServices() async {
+    try {
+      // Initialize realtime notification service
+      await _realtimeNotificationService.initialize();
+
+      // Test database connection
+      await _realtimeNotificationService.testDatabaseConnection();
+
+      // Get current user ID and start background notification service
+      final user = FirebaseAuth.instance.currentUser;
+      final userId = user?.uid;
+      await NativeNotificationService.startBackgroundService(userId: userId);
+
+      debugPrint(
+        'Notification services initialized successfully for user: $userId',
+      );
+    } catch (e) {
+      debugPrint('Error initializing notification services: $e');
+    }
   }
 
   /// Loads the current user's profile information
@@ -111,6 +153,9 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             // Welcome Section
             _buildWelcomeSection(),
+
+            // Notification Alerts Section
+            NotificationAlertsSection(),
 
             const SizedBox(height: 20),
 
@@ -345,6 +390,29 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        // Third row with notification testing
+        Row(
+          children: [
+            Expanded(
+              child: _buildActionCard(
+                icon: Icons.notification_add,
+                title: 'Test Notification',
+                subtitle: 'Test database connection',
+                color: Colors.red,
+                onTap: _testNotificationSend,
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: Container(), // Empty space for symmetry
             ),
           ],
         ),
@@ -589,23 +657,60 @@ class _HomeScreenState extends State<HomeScreen> {
           'Google Maps: $mapsUrl\n'
           'Please check on me ASAP.';
 
-      // Step 6: Send automatic SMS to all contacts
+      // Step 6: Send automatic SMS to contacts with phone numbers
       final phoneNumbers = contacts
           .map((contact) => contact.phoneNumber)
+          .where((phone) => phone.isNotEmpty && phone != 'N/A')
           .toList();
-      int successCount = 0;
+      int smsSuccessCount = 0;
 
       try {
-        successCount = await SMSService.sendEmergencySMSBulk(
+        smsSuccessCount = await SMSService.sendEmergencySMSBulk(
           phoneNumbers: phoneNumbers,
           message: smsMessage,
         );
         debugPrint(
-          'Emergency SMS sent to $successCount/${contacts.length} contacts',
+          'Emergency SMS sent to $smsSuccessCount/${phoneNumbers.length} phone contacts',
         );
       } catch (e) {
         debugPrint('Failed to send emergency SMS: $e');
       }
+
+      // Step 7: Send real-time notifications to app-connected contacts
+      int notificationSuccessCount = 0;
+      final appContacts = contacts
+          .where(
+            (contact) =>
+                contact.contactId != null && contact.contactId!.isNotEmpty,
+          )
+          .toList();
+
+      for (final contact in appContacts) {
+        try {
+          final success = await _realtimeNotificationService
+              .sendNotificationToGuardian(
+                guardianId: contact.contactId!,
+                message: '🚨 EMERGENCY ALERT: I need help! Location: $address',
+                type: 'emergency',
+                metadata: {
+                  'latitude': position.latitude,
+                  'longitude': position.longitude,
+                  'address': address,
+                  'mapsUrl': mapsUrl,
+                  'timestamp': DateTime.now().millisecondsSinceEpoch,
+                },
+              );
+          if (success) notificationSuccessCount++;
+        } catch (e) {
+          debugPrint(
+            'Failed to send emergency notification to ${contact.name}: $e',
+          );
+        }
+      }
+
+      debugPrint(
+        'Emergency notifications sent to $notificationSuccessCount/${appContacts.length} app contacts',
+      );
 
       // Step 7: Make emergency call
       // final Uri emergencyCall = Uri(scheme: 'tel', path: '911');
@@ -614,15 +719,27 @@ class _HomeScreenState extends State<HomeScreen> {
       // }
 
       if (mounted) {
-        final contactCount = contacts.length;
-        final contactText = contactCount > 0
-            ? ' $successCount/$contactCount SMS alerts sent automatically.'
-            : ' No emergency contacts found to notify.';
+        final totalContacts = contacts.length;
+        final smsContacts = phoneNumbers.length;
+        final appContactsCount = appContacts.length;
+
+        String alertText = '🚨 Emergency alert activated!';
+        if (smsContacts > 0) {
+          alertText += '\n📱 SMS: $smsSuccessCount/$smsContacts sent';
+        }
+        if (appContactsCount > 0) {
+          alertText +=
+              '\n🔔 App notifications: $notificationSuccessCount/$appContactsCount sent';
+        }
+        if (totalContacts == 0) {
+          alertText += '\n⚠️ No emergency contacts found to notify.';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('🚨 Emergency alert activated!$contactText'),
+            content: Text(alertText),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
+            duration: const Duration(seconds: 6),
           ),
         );
       }
@@ -641,6 +758,74 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _isSOSLoading = false;
         });
+      }
+    }
+  }
+
+  /// Test notification sending functionality
+  Future<void> _testNotificationSend() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Not logged in! Please authenticate first.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      // Show loading indicator
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('🔄 Testing full notification system...'),
+          backgroundColor: Colors.blue,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Test 1: Write persistent test data
+      await _realtimeNotificationService.writePersistentTestData();
+
+      // Test 2: Send notification to self (tests both foreground and background listeners)
+      final notificationSuccess = await _realtimeNotificationService
+          .sendNotificationToGuardian(
+            guardianId: user.uid, // Send to self
+            message:
+                '🧪 Test notification sent at ${DateTime.now()}. This tests both Flutter and Kotlin listeners!',
+            type: 'test',
+            metadata: {
+              'test_type': 'full_system_test',
+              'sent_from': 'flutter_app',
+              'timestamp': DateTime.now().millisecondsSinceEpoch,
+            },
+          );
+
+      final success = notificationSuccess;
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              success
+                  ? '✅ Full notification system test completed!\n• Data written to Firebase\n• Self-notification sent\n• Check logs for Flutter & Kotlin listeners'
+                  : '❌ Notification system test failed. Check logs for details.',
+            ),
+            backgroundColor: success ? Colors.green : Colors.red,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error in test notification: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error in test: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'database_service.dart';
 import 'sms_service.dart';
+import 'realtime_notification_service.dart';
 import '../models/enhanced_emergency_contact.dart';
 
 /// Intelligent notification service for emergency alerts
@@ -17,6 +18,8 @@ class IntelligentNotificationService {
   IntelligentNotificationService._internal();
 
   final DatabaseService _databaseService = DatabaseService();
+  final RealtimeNotificationService _realtimeNotificationService =
+      RealtimeNotificationService();
   final Map<String, Timer> _responseTimers = {};
   final Map<String, int> _escalationLevels = {};
 
@@ -64,6 +67,14 @@ class IntelligentNotificationService {
         message: message,
         latitude: latitude,
         longitude: longitude,
+      );
+
+      // Send realtime notifications to live guardians (emergency contacts without phone numbers)
+      await _sendRealtimeNotificationsToGuardians(
+        emergencyMessage: message,
+        latitude: latitude,
+        longitude: longitude,
+        address: address,
       );
 
       debugPrint(
@@ -563,6 +574,25 @@ Coordinates: ${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}
 This is escalation level $level. Please respond immediately or call emergency services.
 
 Time: ${DateTime.now().toString()}''';
+  }
+
+  /// Send realtime notifications to live guardians without phone numbers
+  Future<void> _sendRealtimeNotificationsToGuardians({
+    required String emergencyMessage,
+    required double latitude,
+    required double longitude,
+    required String address,
+  }) async {
+    try {
+      await _realtimeNotificationService.sendEmergencyNotificationsToGuardians(
+        emergencyMessage: emergencyMessage,
+        latitude: latitude,
+        longitude: longitude,
+        address: address,
+      );
+    } catch (e) {
+      debugPrint('Error sending realtime notifications to guardians: $e');
+    }
   }
 
   /// Generate unique notification ID

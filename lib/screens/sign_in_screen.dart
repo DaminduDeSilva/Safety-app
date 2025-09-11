@@ -321,48 +321,48 @@ class _SignInPageState extends State<SignInPage> {
                 ),
               ),
               const SizedBox(height: 32),
-              // const Divider(),
-              // const SizedBox(height: 16),
-              // Text(
-              //   'Development Login',
-              //   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              //     fontWeight: FontWeight.bold,
-              //     color: Colors.grey[600],
-              //   ),
-              // ),
-              // const SizedBox(height: 16),
-              // SizedBox(
-              //   width: double.infinity,
-              //   height: 48,
-              //   child: ElevatedButton(
-              //     onPressed: _isLoading
-              //         ? null
-              //         : () => _devLogin('a@gmail.com', '12345678'),
-              //     style: ElevatedButton.styleFrom(
-              //       backgroundColor: Colors.orange,
-              //       foregroundColor: Colors.white,
-              //     ),
-              //     child: const Text('Dev Login: a@gmail.com'),
-              //   ),
-              // ),
-              // const SizedBox(height: 12),
-              // SizedBox(
-              //   width: double.infinity,
-              //   height: 48,
-              //   child: ElevatedButton(
-              //     onPressed: _isLoading
-              //         ? null
-              //         : () => _devLogin(
-              //             'my3palasirisena2384@gmail.com',
-              //             '12345678',
-              //           ),
-              //     style: ElevatedButton.styleFrom(
-              //       backgroundColor: Colors.purple,
-              //       foregroundColor: Colors.white,
-              //     ),
-              //     child: const Text('Dev Login: my3palasirisena2384@gmail.com'),
-              //   ),
-              // ),
+              const Divider(),
+              const SizedBox(height: 16),
+              Text(
+                'Development Login',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: _isLoading
+                      ? null
+                      : () => _devLogin('a@gmail.com', '12345678'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Dev Login: a@gmail.com'),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: _isLoading
+                      ? null
+                      : () => _devLogin(
+                          'my3palasirisena2384@gmail.com',
+                          '12345678',
+                        ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.purple,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Dev Login: my3palasirisena2384@gmail.com'),
+                ),
+              ),
             ],
           ),
         ),

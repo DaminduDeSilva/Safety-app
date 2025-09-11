@@ -5,7 +5,10 @@ import 'firebase_options.dart';
 import 'screens/sign_in_screen.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/profile_setup_screen.dart';
+import 'screens/permission_request_screen.dart';
 import 'services/database_service.dart';
+import 'services/user_session_service.dart';
+import 'services/permission_manager_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,6 +49,26 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   final DatabaseService _databaseService = DatabaseService();
+  final UserSessionService _sessionService = UserSessionService();
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeUserSession();
+  }
+
+  /// Initialize user session tracking
+  void _initializeUserSession() {
+    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      _sessionService.updateFromFirebaseUser(user);
+    });
+  }
+
+  /// Quick check for critical permissions (location)
+  Future<bool> _checkCriticalPermissions() async {
+    final permissionManager = PermissionManagerService();
+    return await permissionManager.isLocationEnabled();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,8 +93,26 @@ class _AuthWrapperState extends State<AuthWrapper> {
               }
 
               if (profileSnapshot.data == true) {
-                // Profile is complete, show main navigation
-                return const MainNavigationScreen();
+                // Profile is complete, check permissions
+                return FutureBuilder<bool>(
+                  future: _checkCriticalPermissions(),
+                  builder: (context, permissionSnapshot) {
+                    if (permissionSnapshot.connectionState ==
+                        ConnectionState.waiting) {
+                      return const Scaffold(
+                        body: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+
+                    if (permissionSnapshot.data == true) {
+                      // Permissions OK, show main navigation
+                      return const MainNavigationScreen();
+                    } else {
+                      // Need to request permissions
+                      return const PermissionRequestScreen();
+                    }
+                  },
+                );
               } else {
                 // Profile is not complete, show profile setup screen
                 return const ProfileSetupScreen();
