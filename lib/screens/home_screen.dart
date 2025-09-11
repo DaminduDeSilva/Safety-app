@@ -8,13 +8,11 @@ import '../services/realtime_notification_service.dart';
 import '../services/native_notification_service.dart';
 import '../services/permission_manager_service.dart';
 import '../models/user_model.dart';
-import '../models/fake_call_model.dart';
 import '../widgets/modern_app_bar.dart';
 import '../widgets/notification_alerts_section.dart';
 import 'live_location_screen.dart';
 import 'report_unsafe_zone_screen.dart';
 import 'emergency_sos_screen.dart';
-import 'fake_call_screen.dart';
 
 /// Clean and focused home dashboard for the safety app.
 ///
@@ -62,7 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await _realtimeNotificationService.initialize();
 
       // Test database connection
-      await _realtimeNotificationService.testDatabaseConnection();
+      // await _realtimeNotificationService.testDatabaseConnection();
 
       // Get current user ID and start background notification service
       final user = FirebaseAuth.instance.currentUser;
@@ -359,63 +357,72 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 12),
 
         // Second row with fake call features
-        Row(
-          children: [
-            Expanded(
-              child: _buildActionCard(
-                icon: Icons.phone_in_talk,
-                title: 'Quick Call',
-                subtitle: 'Emergency fake call',
-                color: Colors.green,
-                onTap: _triggerQuickFakeCall,
-              ),
-            ),
+        // Row(
+        //   children: [
+        //     Expanded(
+        //       child: _buildActionCard(
+        //         icon: Icons.phone_in_talk,
+        //         title: 'Quick Call',
+        //         subtitle: 'Emergency fake call',
+        //         color: Colors.green,
+        //         onTap: () {
+        //           Navigator.push(
+        //             context,
+        //             MaterialPageRoute(
+        //               builder: (context) => FakeCallScreen(
+        //                 config: FakeCallTemplates.defaultTemplates.first,
+        //               ),
+        //             ),
+        //           );
+        //         },
+        //       ),
+        //     ),
 
-            const SizedBox(width: 12),
+        //     // const SizedBox(width: 12),
 
-            Expanded(
-              child: _buildActionCard(
-                icon: Icons.settings_phone,
-                title: 'Call Settings',
-                subtitle: 'Configure fake calls',
-                color: Colors.purple,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => FakeCallScreen(
-                        config: FakeCallTemplates.defaultTemplates.first,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+        //     // Expanded(
+        //     //   child: _buildActionCard(
+        //     //     icon: Icons.settings_phone,
+        //     //     title: 'Call Settings',
+        //     //     subtitle: 'Configure fake calls',
+        //     //     color: Colors.purple,
+        //     //     onTap: () {
+        //     //       Navigator.push(
+        //     //         context,
+        //     //         MaterialPageRoute(
+        //     //           builder: (context) => FakeCallScreen(
+        //     //             config: FakeCallTemplates.defaultTemplates.first,
+        //     //           ),
+        //     //         ),
+        //     //       );
+        //     //     },
+        //     //   ),
+        //     // ),
+        //   ],
+        // ),
 
-        const SizedBox(height: 12),
+        // const SizedBox(height: 12),
 
         // Third row with notification testing
-        Row(
-          children: [
-            Expanded(
-              child: _buildActionCard(
-                icon: Icons.notification_add,
-                title: 'Test Notification',
-                subtitle: 'Test database connection',
-                color: Colors.red,
-                onTap: _testNotificationSend,
-              ),
-            ),
+        // Row(
+        //   children: [
+        //     Expanded(
+        //       child: _buildActionCard(
+        //         icon: Icons.notification_add,
+        //         title: 'Test Notification',
+        //         subtitle: 'Test database connection',
+        //         color: Colors.red,
+        //         onTap: _testNotificationSend,
+        //       ),
+        //     ),
 
-            const SizedBox(width: 12),
+        //     const SizedBox(width: 12),
 
-            Expanded(
-              child: Container(), // Empty space for symmetry
-            ),
-          ],
-        ),
+        //     Expanded(
+        //       child: Container(), // Empty space for symmetry
+        //     ),
+        //   ],
+        // ),
       ],
     );
   }
@@ -763,70 +770,70 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// Test notification sending functionality
-  Future<void> _testNotificationSend() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Not logged in! Please authenticate first.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        return;
-      }
+  // Future<void> _testNotificationSend() async {
+  //   try {
+  //     final user = FirebaseAuth.instance.currentUser;
+  //     if (user == null) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(
+  //           content: Text('Not logged in! Please authenticate first.'),
+  //           backgroundColor: Colors.orange,
+  //         ),
+  //       );
+  //       return;
+  //     }
 
-      // Show loading indicator
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('🔄 Testing full notification system...'),
-          backgroundColor: Colors.blue,
-          duration: Duration(seconds: 2),
-        ),
-      );
+  //     // Show loading indicator
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(
+  //         content: Text('🔄 Testing full notification system...'),
+  //         backgroundColor: Colors.blue,
+  //         duration: Duration(seconds: 2),
+  //       ),
+  //     );
 
-      // Test 1: Write persistent test data
-      await _realtimeNotificationService.writePersistentTestData();
+  //     // Test 1: Write persistent test data
+  //     await _realtimeNotificationService.writePersistentTestData();
 
-      // Test 2: Send notification to self (tests both foreground and background listeners)
-      final notificationSuccess = await _realtimeNotificationService
-          .sendNotificationToGuardian(
-            guardianId: user.uid, // Send to self
-            message:
-                '🧪 Test notification sent at ${DateTime.now()}. This tests both Flutter and Kotlin listeners!',
-            type: 'test',
-            metadata: {
-              'test_type': 'full_system_test',
-              'sent_from': 'flutter_app',
-              'timestamp': DateTime.now().millisecondsSinceEpoch,
-            },
-          );
+  //     // Test 2: Send notification to self (tests both foreground and background listeners)
+  //     final notificationSuccess = await _realtimeNotificationService
+  //         .sendNotificationToGuardian(
+  //           guardianId: user.uid, // Send to self
+  //           message:
+  //               '🧪 Test notification sent at ${DateTime.now()}. This tests both Flutter and Kotlin listeners!',
+  //           type: 'test',
+  //           metadata: {
+  //             'test_type': 'full_system_test',
+  //             'sent_from': 'flutter_app',
+  //             'timestamp': DateTime.now().millisecondsSinceEpoch,
+  //           },
+  //         );
 
-      final success = notificationSuccess;
+  //     final success = notificationSuccess;
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              success
-                  ? '✅ Full notification system test completed!\n• Data written to Firebase\n• Self-notification sent\n• Check logs for Flutter & Kotlin listeners'
-                  : '❌ Notification system test failed. Check logs for details.',
-            ),
-            backgroundColor: success ? Colors.green : Colors.red,
-            duration: const Duration(seconds: 6),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error in test notification: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Error in test: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(
+  //           content: Text(
+  //             success
+  //                 ? '✅ Full notification system test completed!\n• Data written to Firebase\n• Self-notification sent\n• Check logs for Flutter & Kotlin listeners'
+  //                 : '❌ Notification system test failed. Check logs for details.',
+  //           ),
+  //           backgroundColor: success ? Colors.green : Colors.red,
+  //           duration: const Duration(seconds: 6),
+  //         ),
+  //       );
+  //     }
+  //   } catch (e) {
+  //     debugPrint('Error in test notification: $e');
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(
+  //           content: Text('❌ Error in test: ${e.toString()}'),
+  //           backgroundColor: Colors.red,
+  //         ),
+  //       );
+  //     }
+  //   }
+  // }
 }

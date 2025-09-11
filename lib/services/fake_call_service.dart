@@ -179,24 +179,7 @@ class FakeCallService {
 
   /// Generate a random caller name for emergency situations
   String generateRandomCallerName() {
-    final names = [
-      'Mom',
-      'Dad',
-      'Sister',
-      'Brother',
-      'Boss',
-      'Doctor',
-      'Dentist',
-      'Roommate',
-      'Best Friend',
-      'Work',
-      'Emergency',
-      'Hospital',
-      'School',
-      'University',
-      'Bank',
-      'Insurance',
-    ];
+    final names = ['Mom', 'Dad', 'Brother'];
     return names[Random().nextInt(names.length)];
   }
 

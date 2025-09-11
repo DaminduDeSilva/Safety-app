@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -131,6 +130,10 @@ class RealtimeNotificationService {
   /// Handle notification tap
   void _onNotificationTapped(NotificationResponse response) {
     debugPrint('Notification tapped: ${response.payload}');
+
+    // Don't automatically mark as read - let user use the "Mark Read" button in UI
+    debugPrint('Notification tapped, user can mark as read using UI button');
+
     // Navigate to appropriate screen based on payload
     // This will be handled by the main app navigation
   }
@@ -200,13 +203,31 @@ class RealtimeNotificationService {
             );
             debugPrint('🔔 Notification data: $notificationData');
 
-            // Show simple notification
-            await _showSimpleNotification(
-              title:
-                  notificationData['senderName']?.toString() ?? 'Safety Alert',
-              message:
-                  notificationData['message']?.toString() ?? 'New notification',
-            );
+            // Check if notification is already read and timestamp for recent notifications
+            final isRead = notificationData['isRead'] as bool? ?? false;
+            final timestamp = notificationData['timestamp'] as int? ?? 0;
+            final fiveMinutesAgo =
+                DateTime.now().millisecondsSinceEpoch - (5 * 60 * 1000);
+
+            if (!isRead && timestamp > fiveMinutesAgo) {
+              debugPrint('🔔 Showing unread recent notification');
+
+              // Show simple notification
+              await _showSimpleNotification(
+                title:
+                    notificationData['senderName']?.toString() ??
+                    'Safety Alert',
+                message:
+                    notificationData['message']?.toString() ??
+                    'New notification',
+                notificationId:
+                    entry.key, // Pass the notification ID for tracking
+              );
+            } else {
+              debugPrint(
+                '🔔 Skipping notification (read: $isRead, timestamp: $timestamp)',
+              );
+            }
           }
         }
       }
@@ -219,6 +240,7 @@ class RealtimeNotificationService {
   Future<void> _showSimpleNotification({
     required String title,
     required String message,
+    String? notificationId,
   }) async {
     try {
       const androidDetails = AndroidNotificationDetails(
@@ -245,11 +267,44 @@ class RealtimeNotificationService {
         title,
         message,
         notificationDetails,
+        payload: notificationId, // Pass sender ID as payload for reference
       );
 
       debugPrint('✅ Local notification shown: $title - $message');
+      debugPrint(
+        '📌 Notification will remain unread until user marks it as read in UI',
+      );
     } catch (e) {
       debugPrint('❌ Error showing local notification: $e');
+    }
+  }
+
+  // Removed automatic mark-as-read functionality
+  // Notifications are now only marked as read when user clicks "Mark Read" button in UI
+
+  /// Mark all notifications as read
+  Future<void> markAllNotificationsAsRead() async {
+    try {
+      final userId = await _getCurrentUserId();
+      if (userId == null) return;
+
+      final notificationsRef = _database.ref('notifications/$userId');
+      final snapshot = await notificationsRef.get();
+
+      if (snapshot.exists && snapshot.value is Map) {
+        final notifications = Map<String, dynamic>.from(snapshot.value as Map);
+
+        for (final senderId in notifications.keys) {
+          await notificationsRef.child(senderId).update({
+            'isRead': true,
+            'readAt': DateTime.now().millisecondsSinceEpoch,
+          });
+        }
+      }
+
+      debugPrint('✅ Marked all notifications as read');
+    } catch (e) {
+      debugPrint('❌ Error marking all notifications as read: $e');
     }
   }
 
@@ -421,10 +476,11 @@ class RealtimeNotificationService {
     try {
       await _database.ref('notifications/$userId/$senderId').update({
         'isRead': true,
-        'readAt': ServerValue.timestamp,
+        'readAt': DateTime.now().millisecondsSinceEpoch,
       });
+      debugPrint('✅ Marked notification as read: $senderId');
     } catch (e) {
-      debugPrint('Error marking notification as read: $e');
+      debugPrint('❌ Error marking notification as read: $e');
     }
   }
 
@@ -438,11 +494,6 @@ class RealtimeNotificationService {
     } catch (e) {
       debugPrint('Error clearing notifications: $e');
     }
-  }
-
-  /// Generate unique notification ID
-  String _generateNotificationId() {
-    return '${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(1000)}';
   }
 
   /// Test database connectivity with simple write/read
@@ -626,6 +677,7 @@ class RealtimeNotificationService {
           continue;
         }
 
+        // Count only unread notifications
         if (notificationData['isRead'] != true) {
           unreadCount++;
         }
