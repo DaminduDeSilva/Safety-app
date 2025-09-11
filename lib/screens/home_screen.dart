@@ -601,10 +601,10 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       // Step 7: Make emergency call
-      final Uri emergencyCall = Uri(scheme: 'tel', path: '911');
-      if (await canLaunchUrl(emergencyCall)) {
-        await launchUrl(emergencyCall);
-      }
+      // final Uri emergencyCall = Uri(scheme: 'tel', path: '911');
+      // if (await canLaunchUrl(emergencyCall)) {
+      //   await launchUrl(emergencyCall);
+      // }
 
       if (mounted) {
         final contactCount = contacts.length;
