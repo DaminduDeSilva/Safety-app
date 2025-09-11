@@ -26,9 +26,9 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     
     <application
-        android:label="safety_app_prototype"
+        android:label="Suraksha"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/png">
         <activity
             android:name=".MainActivity"
             android:exported="true"
