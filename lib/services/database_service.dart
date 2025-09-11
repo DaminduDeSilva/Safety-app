@@ -177,15 +177,24 @@ class DatabaseService {
   Future<List<EmergencyContact>> getEmergencyContacts() async {
     try {
       final userId = _currentUserId;
+      debugPrint('Getting emergency contacts for user: $userId');
+
       final querySnapshot = await _firestore
           .collection('users')
           .doc(userId)
           .collection('emergency_contacts')
           .get();
 
-      return querySnapshot.docs
+      final contacts = querySnapshot.docs
           .map((doc) => EmergencyContact.fromMap(doc.data(), doc.id))
           .toList();
+
+      debugPrint('Found ${contacts.length} emergency contacts');
+      for (final contact in contacts) {
+        debugPrint('Contact: ${contact.name} - ${contact.phoneNumber}');
+      }
+
+      return contacts;
     } catch (e) {
       debugPrint('Error getting emergency contacts: $e');
       rethrow;

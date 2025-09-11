@@ -3,13 +3,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/database_service.dart';
 import '../services/location_service.dart';
 import '../services/fake_call_service.dart';
+import '../services/sms_service.dart';
 import '../models/user_model.dart';
+import '../models/fake_call_model.dart';
 import '../widgets/modern_app_bar.dart';
 import 'live_location_screen.dart';
 import 'report_unsafe_zone_screen.dart';
 import 'emergency_sos_screen.dart';
-import 'fake_call_config_screen.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'fake_call_screen.dart';
 
 /// Clean and focused home dashboard for the safety app.
 ///
@@ -337,7 +338,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const FakeCallConfigScreen(),
+                      builder: (context) => FakeCallScreen(
+                        config: FakeCallTemplates.defaultTemplates.first,
+                      ),
                     ),
                   );
                 },
@@ -586,18 +589,22 @@ class _HomeScreenState extends State<HomeScreen> {
           'Google Maps: $mapsUrl\n'
           'Please check on me ASAP.';
 
-      // Step 6: Send SMS to each contact
-      for (final contact in contacts) {
-        try {
-          final smsUrl = Uri.parse(
-            'sms:${contact.phoneNumber}?body=${Uri.encodeComponent(smsMessage)}',
-          );
-          await launchUrl(smsUrl);
-          debugPrint('SMS sent to ${contact.name} (${contact.phoneNumber})');
-        } catch (e) {
-          debugPrint('Failed to send SMS to ${contact.phoneNumber}: $e');
-          // Continue to next contact - don't let SMS failure stop the emergency alert
-        }
+      // Step 6: Send automatic SMS to all contacts
+      final phoneNumbers = contacts
+          .map((contact) => contact.phoneNumber)
+          .toList();
+      int successCount = 0;
+
+      try {
+        successCount = await SMSService.sendEmergencySMSBulk(
+          phoneNumbers: phoneNumbers,
+          message: smsMessage,
+        );
+        debugPrint(
+          'Emergency SMS sent to $successCount/${contacts.length} contacts',
+        );
+      } catch (e) {
+        debugPrint('Failed to send emergency SMS: $e');
       }
 
       // Step 7: Make emergency call
@@ -609,13 +616,11 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         final contactCount = contacts.length;
         final contactText = contactCount > 0
-            ? ' SMS alerts sent to $contactCount contact${contactCount == 1 ? '' : 's'}.'
+            ? ' $successCount/$contactCount SMS alerts sent automatically.'
             : ' No emergency contacts found to notify.';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              '🚨 Emergency alert sent!$contactText Calling emergency services...',
-            ),
+            content: Text('🚨 Emergency alert activated!$contactText'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 4),
           ),

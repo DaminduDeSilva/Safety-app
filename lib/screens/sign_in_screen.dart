@@ -91,18 +91,124 @@ class _SignInPageState extends State<SignInPage> {
         // Log the actual error for debugging
         debugPrint('Unexpected error during authentication: $e');
 
-        // Only show the error message if authentication actually failed
-        // Check if user is not signed in to determine if this was a real failure
-        if (FirebaseAuth.instance.currentUser == null) {
+        // Check for the specific Firebase Auth pigeon type casting issue
+        final errorString = e.toString();
+        final isPigeonTypeError =
+            errorString.contains('PigeonUserDetails') ||
+            errorString.contains('type cast') ||
+            errorString.contains('List<Object?>');
+
+        // Check if user is actually signed in despite the error
+        final currentUser = FirebaseAuth.instance.currentUser;
+
+        if (currentUser != null) {
+          // Authentication succeeded despite the error
+          debugPrint('Authentication succeeded despite error: $e');
+          if (isPigeonTypeError) {
+            // This is a known Firebase Auth pigeon issue, show success message
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Sign in successful!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } else {
+            // Other non-critical error, just log it
+            debugPrint('Non-critical authentication error: $e');
+          }
+        } else {
+          // Authentication actually failed, show error
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('An unexpected error occurred: ${e.toString()}'),
+              content: Text('Authentication failed: ${e.toString()}'),
               backgroundColor: Colors.red,
             ),
           );
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _devLogin(String email, String password) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      if (mounted && credential.user != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Dev login successful: $email'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'user-not-found':
+          message = 'Dev account not found. Please create the account first.';
+          break;
+        case 'wrong-password':
+          message = 'Wrong password for dev account.';
+          break;
+        case 'invalid-email':
+          message = 'The email address is not valid.';
+          break;
+        default:
+          message = e.message ?? 'Dev login failed. Please try again.';
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        debugPrint('Unexpected error during dev login: $e');
+
+        // Check for the specific Firebase Auth pigeon type casting issue
+        final errorString = e.toString();
+        final isPigeonTypeError =
+            errorString.contains('PigeonUserDetails') ||
+            errorString.contains('type cast') ||
+            errorString.contains('List<Object?>');
+
+        // Check if user is actually signed in despite the error
+        final currentUser = FirebaseAuth.instance.currentUser;
+
+        if (currentUser != null) {
+          // Authentication succeeded despite the error
+          debugPrint('Dev login succeeded despite error: $e');
+          if (isPigeonTypeError) {
+            // This is a known Firebase Auth pigeon issue, show success message
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Dev login successful!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
         } else {
-          // User is signed in despite the error, so this might be a non-critical error
-          debugPrint('Authentication succeeded despite error: $e');
+          // Authentication actually failed, show error
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Dev login error: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
       }
     } finally {
@@ -214,6 +320,49 @@ class _SignInPageState extends State<SignInPage> {
                       : "Don't have an account? Sign Up",
                 ),
               ),
+              const SizedBox(height: 32),
+              // const Divider(),
+              // const SizedBox(height: 16),
+              // Text(
+              //   'Development Login',
+              //   style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              //     fontWeight: FontWeight.bold,
+              //     color: Colors.grey[600],
+              //   ),
+              // ),
+              // const SizedBox(height: 16),
+              // SizedBox(
+              //   width: double.infinity,
+              //   height: 48,
+              //   child: ElevatedButton(
+              //     onPressed: _isLoading
+              //         ? null
+              //         : () => _devLogin('a@gmail.com', '12345678'),
+              //     style: ElevatedButton.styleFrom(
+              //       backgroundColor: Colors.orange,
+              //       foregroundColor: Colors.white,
+              //     ),
+              //     child: const Text('Dev Login: a@gmail.com'),
+              //   ),
+              // ),
+              // const SizedBox(height: 12),
+              // SizedBox(
+              //   width: double.infinity,
+              //   height: 48,
+              //   child: ElevatedButton(
+              //     onPressed: _isLoading
+              //         ? null
+              //         : () => _devLogin(
+              //             'my3palasirisena2384@gmail.com',
+              //             '12345678',
+              //           ),
+              //     style: ElevatedButton.styleFrom(
+              //       backgroundColor: Colors.purple,
+              //       foregroundColor: Colors.white,
+              //     ),
+              //     child: const Text('Dev Login: my3palasirisena2384@gmail.com'),
+              //   ),
+              // ),
             ],
           ),
         ),

@@ -20,6 +20,97 @@ class ContactsScreen extends StatefulWidget {
 class _ContactsScreenState extends State<ContactsScreen> {
   final DatabaseService _databaseService = DatabaseService();
 
+  /// Format and clean phone number
+  String _formatPhoneNumber(String phoneNumber) {
+    // Remove all non-digit characters except + at the beginning
+    String cleaned = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+
+    // If starts with +, keep it, otherwise remove any + in the middle
+    if (cleaned.startsWith('+')) {
+      cleaned = '+' + cleaned.substring(1).replaceAll('+', '');
+    } else {
+      cleaned = cleaned.replaceAll('+', '');
+
+      // Handle common country-specific formatting
+      if (cleaned.isNotEmpty) {
+        // Sri Lankan numbers: convert 0XXXXXXXXX to +94XXXXXXXXX
+        if (cleaned.startsWith('0') && cleaned.length == 10) {
+          cleaned = '+94${cleaned.substring(1)}';
+        }
+        // US/Canada numbers: convert 1XXXXXXXXXX or XXXXXXXXXX to +1XXXXXXXXXX
+        else if (cleaned.length == 11 && cleaned.startsWith('1')) {
+          cleaned = '+$cleaned';
+        } else if (cleaned.length == 10 && !cleaned.startsWith('0')) {
+          cleaned = '+1$cleaned'; // Assume US/Canada
+        }
+      }
+    }
+
+    return cleaned;
+  }
+
+  /// Validate if phone number is in correct format
+  bool _isValidPhoneNumber(String phoneNumber) {
+    if (phoneNumber.isEmpty) return false;
+
+    // Must be in international format starting with +
+    if (!phoneNumber.startsWith('+')) {
+      return false;
+    }
+
+    // International format: +[country code][number] (at least 11 digits total)
+    return phoneNumber.length >= 11 &&
+        phoneNumber.length <= 16 && // Maximum international number length
+        RegExp(r'^\+\d{10,15}$').hasMatch(phoneNumber);
+  }
+
+  /// Fix existing contacts with invalid phone numbers
+  Future<void> _fixExistingContacts() async {
+    try {
+      final contacts = await _databaseService.getEmergencyContacts();
+      int fixedCount = 0;
+
+      for (final contact in contacts) {
+        final currentPhone = contact.phoneNumber;
+        final formattedPhone = _formatPhoneNumber(currentPhone);
+
+        // Only update if the phone number changed and is now valid
+        if (currentPhone != formattedPhone &&
+            _isValidPhoneNumber(formattedPhone)) {
+          final updatedContact = contact.copyWith(phoneNumber: formattedPhone);
+          await _databaseService.updateEmergencyContact(updatedContact);
+          fixedCount++;
+          debugPrint(
+            'Fixed phone number for ${contact.name}: $currentPhone -> $formattedPhone',
+          );
+        } else if (!_isValidPhoneNumber(formattedPhone)) {
+          debugPrint(
+            'Cannot fix invalid phone number for ${contact.name}: $currentPhone',
+          );
+        }
+      }
+
+      if (mounted && fixedCount > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Fixed $fixedCount phone number(s)'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error fixing existing contacts: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error fixing contacts: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   /// Requests contacts permission and imports contacts from phone
   Future<void> _importContactsFromPhone() async {
     try {
@@ -256,10 +347,13 @@ class _ContactsScreenState extends State<ContactsScreen> {
         final phoneNumber = contact.phones.first.number;
         final name = contact.displayName;
 
-        // Clean phone number (remove spaces, dashes, parentheses)
-        final cleanedPhone = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+        // Clean and format phone number properly
+        final cleanedPhone = _formatPhoneNumber(phoneNumber);
 
-        if (cleanedPhone.isEmpty) {
+        if (cleanedPhone.isEmpty || !_isValidPhoneNumber(cleanedPhone)) {
+          debugPrint(
+            'Invalid phone number for ${contact.displayName}: $phoneNumber',
+          );
           errorCount++;
           continue;
         }
@@ -392,10 +486,27 @@ class _ContactsScreenState extends State<ContactsScreen> {
               onPressed: () async {
                 if (formKey.currentState!.validate()) {
                   try {
+                    // Format phone number before saving
+                    final formattedPhone = _formatPhoneNumber(
+                      phoneController.text.trim(),
+                    );
+
+                    if (!_isValidPhoneNumber(formattedPhone)) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Please enter a valid phone number'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
                     final contact = EmergencyContact(
                       id: '', // Will be set by Firestore
                       name: nameController.text.trim(),
-                      phoneNumber: phoneController.text.trim(),
+                      phoneNumber: formattedPhone,
                       relationship: relationshipController.text.trim(),
                       isPrimary: false, // Can be modified later if needed
                     );
@@ -551,6 +662,11 @@ class _ContactsScreenState extends State<ContactsScreen> {
             },
             icon: const Icon(Icons.mail_outline),
             tooltip: 'Manage Invitations',
+          ),
+          IconButton(
+            onPressed: _fixExistingContacts,
+            icon: const Icon(Icons.phone_android),
+            tooltip: 'Fix Phone Numbers',
           ),
           IconButton(
             onPressed: _importContactsFromPhone,

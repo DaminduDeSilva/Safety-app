@@ -40,12 +40,14 @@ dependencies:
   geolocator: ^10.1.0
   geocoding: ^2.1.1
   url_launcher: ^6.2.5
-  permission_handler: ^11.0.1
+  permission_handler: ^12.0.1
   flutter_contacts: ^1.1.9
   android_intent_plus: ^4.0.3
   google_maps_flutter: ^2.5.0
   http: ^1.1.0
   audioplayers: ^5.0.0
+  # Using URL launcher for SMS as a fallback
+  # sms plugin compatibility issues with newer Android versions
 
 dev_dependencies:
   flutter_test:

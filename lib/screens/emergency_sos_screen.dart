@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import '../services/database_service.dart';
 import '../services/location_service.dart';
 import '../services/intelligent_notification_service.dart';
+import '../services/sms_service.dart';
 import '../models/emergency_contact.dart';
 
 /// Enhanced Emergency SOS screen with Google Maps integration and auto-trigger.
@@ -166,6 +167,9 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
         address: _emergencyAddress ?? 'Location not available',
       );
 
+      // Send automatic SMS messages
+      await _sendAutomaticSMS();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -192,6 +196,42 @@ class _EmergencySOSScreenState extends State<EmergencySOSScreen> {
           context,
         ).showSnackBar(SnackBar(content: Text('Error triggering SOS: $e')));
       }
+    }
+  }
+
+  /// Send automatic SMS messages to emergency contacts
+  Future<void> _sendAutomaticSMS() async {
+    if (_contacts.isEmpty) {
+      debugPrint('No emergency contacts to notify');
+      return;
+    }
+
+    try {
+      // Build SMS message with location
+      final mapsUrl =
+          'https://maps.google.com/?q=${_emergencyLocation!.latitude},${_emergencyLocation!.longitude}';
+      final smsMessage =
+          'EMERGENCY! I need help!\n'
+          'Location: ${_emergencyAddress ?? 'Location not available'}\n'
+          'Google Maps: $mapsUrl\n'
+          'Please check on me ASAP.';
+
+      // Extract phone numbers from contacts
+      final phoneNumbers = _contacts
+          .map((contact) => contact.phoneNumber)
+          .toList();
+
+      // Send emergency SMS to all contacts efficiently
+      final successCount = await SMSService.sendEmergencySMSBulk(
+        phoneNumbers: phoneNumbers,
+        message: smsMessage,
+      );
+
+      debugPrint(
+        'Emergency SMS opened for $successCount/${_contacts.length} contacts',
+      );
+    } catch (e) {
+      debugPrint('Error sending automatic SMS: $e');
     }
   }
 

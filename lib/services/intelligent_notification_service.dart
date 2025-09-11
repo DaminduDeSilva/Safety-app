@@ -3,14 +3,16 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'database_service.dart';
+import 'sms_service.dart';
 import '../models/enhanced_emergency_contact.dart';
 
 /// Intelligent notification service for emergency alerts
-/// 
+///
 /// This service handles smart contact selection and escalation
 /// based on proximity, availability, and response patterns.
 class IntelligentNotificationService {
-  static final IntelligentNotificationService _instance = IntelligentNotificationService._internal();
+  static final IntelligentNotificationService _instance =
+      IntelligentNotificationService._internal();
   factory IntelligentNotificationService() => _instance;
   IntelligentNotificationService._internal();
 
@@ -30,15 +32,20 @@ class IntelligentNotificationService {
       debugPrint('Triggering emergency notifications for: $emergencyId');
 
       // Get and prioritize contacts
-      final prioritizedContacts = await _getPrioritizedContacts(latitude, longitude);
-      
+      final prioritizedContacts = await _getPrioritizedContacts(
+        latitude,
+        longitude,
+      );
+
       if (prioritizedContacts.isEmpty) {
         debugPrint('No emergency contacts available');
         return;
       }
 
       // Create emergency message
-      final message = customMessage ?? _generateEmergencyMessage(address, latitude, longitude);
+      final message =
+          customMessage ??
+          _generateEmergencyMessage(address, latitude, longitude);
 
       // Start with the highest priority contacts (top 3)
       await _sendInitialNotifications(
@@ -59,7 +66,9 @@ class IntelligentNotificationService {
         longitude: longitude,
       );
 
-      debugPrint('Emergency notifications sent to ${prioritizedContacts.take(3).length} contacts');
+      debugPrint(
+        'Emergency notifications sent to ${prioritizedContacts.take(3).length} contacts',
+      );
     } catch (e) {
       debugPrint('Error triggering emergency notifications: $e');
       rethrow;
@@ -72,7 +81,7 @@ class IntelligentNotificationService {
     double longitude,
   ) async {
     final contacts = await _databaseService.getEnhancedEmergencyContacts();
-    
+
     // Update availability scores for all contacts
     final updatedContacts = <EnhancedEmergencyContact>[];
     for (final contact in contacts) {
@@ -213,7 +222,12 @@ class IntelligentNotificationService {
       bool success = false;
       switch (method) {
         case NotificationMethod.pushNotification:
-          success = await _sendPushNotification(contact, message, latitude, longitude);
+          success = await _sendPushNotification(
+            contact,
+            message,
+            latitude,
+            longitude,
+          );
           break;
         case NotificationMethod.sms:
           success = await _sendSMS(contact, message, latitude, longitude);
@@ -234,16 +248,21 @@ class IntelligentNotificationService {
       // Store notification in database
       await _databaseService.addEmergencyNotification(updatedNotification);
 
-      debugPrint('Notification sent to ${contact.name} via ${method.toString().split('.').last}: $success');
+      debugPrint(
+        'Notification sent to ${contact.name} via ${method.toString().split('.').last}: $success',
+      );
     } catch (e) {
       debugPrint('Error sending notification to ${contact.name}: $e');
     }
   }
 
   /// Select the best notification method for a contact
-  NotificationMethod _selectBestNotificationMethod(EnhancedEmergencyContact contact) {
+  NotificationMethod _selectBestNotificationMethod(
+    EnhancedEmergencyContact contact,
+  ) {
     // If contact has the app and is recently active, use push notification
-    if (contact.hasApp && contact.fcmToken != null && 
+    if (contact.hasApp &&
+        contact.fcmToken != null &&
         contact.availability == ContactAvailability.active) {
       return NotificationMethod.pushNotification;
     }
@@ -255,7 +274,8 @@ class IntelligentNotificationService {
     }
 
     // For urgent situations or unavailable contacts, try phone call
-    if (contact.isPrimary || contact.availability == ContactAvailability.possiblyUnavailable) {
+    if (contact.isPrimary ||
+        contact.availability == ContactAvailability.possiblyUnavailable) {
       return NotificationMethod.phoneCall;
     }
 
@@ -276,10 +296,10 @@ class IntelligentNotificationService {
       // In a real implementation, this would use Firebase Cloud Messaging
       // For now, we'll simulate the API call
       debugPrint('Sending push notification to ${contact.name}: $message');
-      
+
       // Simulate API call
       await Future.delayed(const Duration(milliseconds: 500));
-      
+
       return true; // Simulate success
     } catch (e) {
       debugPrint('Failed to send push notification: $e');
@@ -298,18 +318,12 @@ class IntelligentNotificationService {
       // Create SMS with location link
       final locationUrl = 'https://maps.google.com/?q=$latitude,$longitude';
       final smsMessage = '$message\n\nLocation: $locationUrl';
-      
-      final uri = Uri(
-        scheme: 'sms',
-        path: contact.phoneNumber,
-        queryParameters: {'body': smsMessage},
-      );
 
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-        return true;
-      }
-      return false;
+      // Use automatic SMS sending instead of launching SMS app
+      return await SMSService.sendSMSWithRetry(
+        phoneNumber: contact.phoneNumber,
+        message: smsMessage,
+      );
     } catch (e) {
       debugPrint('Failed to send SMS: $e');
       return false;
@@ -320,7 +334,7 @@ class IntelligentNotificationService {
   Future<bool> _makePhoneCall(EnhancedEmergencyContact contact) async {
     try {
       final uri = Uri(scheme: 'tel', path: contact.phoneNumber);
-      
+
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri);
         return true;
@@ -353,16 +367,21 @@ class IntelligentNotificationService {
   /// Setup response timer for contact
   void _setupResponseTimer(String emergencyId, String contactId) {
     final timerId = '${emergencyId}_$contactId';
-    
+
     _responseTimers[timerId] = Timer(const Duration(minutes: 5), () {
       _handleResponseTimeout(emergencyId, contactId);
     });
   }
 
   /// Handle response timeout and escalate if needed
-  Future<void> _handleResponseTimeout(String emergencyId, String contactId) async {
+  Future<void> _handleResponseTimeout(
+    String emergencyId,
+    String contactId,
+  ) async {
     try {
-      debugPrint('Response timeout for contact $contactId in emergency $emergencyId');
+      debugPrint(
+        'Response timeout for contact $contactId in emergency $emergencyId',
+      );
 
       // Mark notification as expired
       await _databaseService.markNotificationExpired(emergencyId, contactId);
@@ -404,12 +423,21 @@ class IntelligentNotificationService {
       if (emergency == null) return;
 
       // Get all contacts and those already notified
-      final allContacts = await _getPrioritizedContacts(emergency.latitude, emergency.longitude);
-      final notifiedContacts = await _databaseService.getNotifiedContacts(emergencyId);
+      final allContacts = await _getPrioritizedContacts(
+        emergency.latitude,
+        emergency.longitude,
+      );
+      final notifiedContacts = await _databaseService.getNotifiedContacts(
+        emergencyId,
+      );
 
       // Find next batch of contacts to notify
       final nextContacts = allContacts
-          .where((contact) => !notifiedContacts.any((notified) => notified.contactId == contact.id))
+          .where(
+            (contact) => !notifiedContacts.any(
+              (notified) => notified.contactId == contact.id,
+            ),
+          )
           .take(2) // Notify 2 more contacts per escalation
           .toList();
 
@@ -419,8 +447,13 @@ class IntelligentNotificationService {
       }
 
       // Send notifications to next batch
-      final message = _generateEscalationMessage(emergency.address, level, emergency.latitude, emergency.longitude);
-      
+      final message = _generateEscalationMessage(
+        emergency.address,
+        level,
+        emergency.latitude,
+        emergency.longitude,
+      );
+
       for (final contact in nextContacts) {
         await _sendNotificationToContact(
           emergencyId: emergencyId,
@@ -452,7 +485,9 @@ class IntelligentNotificationService {
     required ContactResponse response,
   }) async {
     try {
-      debugPrint('Contact $contactId responded to emergency $emergencyId: $response');
+      debugPrint(
+        'Contact $contactId responded to emergency $emergencyId: $response',
+      );
 
       // Cancel response timer
       final timerId = '${emergencyId}_$contactId';
@@ -460,11 +495,15 @@ class IntelligentNotificationService {
       _responseTimers.remove(timerId);
 
       // Update notification with response
-      await _databaseService.updateNotificationResponse(emergencyId, contactId, response);
+      await _databaseService.updateNotificationResponse(
+        emergencyId,
+        contactId,
+        response,
+      );
 
       // If someone is helping, reduce escalation
-      if (response == ContactResponse.willHelp || 
-          response == ContactResponse.onMyWay || 
+      if (response == ContactResponse.willHelp ||
+          response == ContactResponse.onMyWay ||
           response == ContactResponse.calledAuthorities) {
         await _reduceEscalation(emergencyId);
       }
@@ -475,8 +514,10 @@ class IntelligentNotificationService {
 
   /// Reduce escalation when help is confirmed
   Future<void> _reduceEscalation(String emergencyId) async {
-    debugPrint('Help confirmed for emergency $emergencyId, reducing escalation');
-    
+    debugPrint(
+      'Help confirmed for emergency $emergencyId, reducing escalation',
+    );
+
     // Cancel all pending escalation timers for this emergency
     _responseTimers.removeWhere((key, timer) {
       if (key.startsWith(emergencyId)) {
@@ -488,7 +529,11 @@ class IntelligentNotificationService {
   }
 
   /// Generate emergency message
-  String _generateEmergencyMessage(String address, double latitude, double longitude) {
+  String _generateEmergencyMessage(
+    String address,
+    double latitude,
+    double longitude,
+  ) {
     return '''🚨 EMERGENCY ALERT 🚨
 
 I need immediate help! This is an automated emergency alert from my safety app.
@@ -502,7 +547,12 @@ Time: ${DateTime.now().toString()}''';
   }
 
   /// Generate escalation message
-  String _generateEscalationMessage(String address, int level, double latitude, double longitude) {
+  String _generateEscalationMessage(
+    String address,
+    int level,
+    double latitude,
+    double longitude,
+  ) {
     return '''🚨 URGENT: Emergency Alert (Escalation Level $level) 🚨
 
 Previous contacts haven't responded. I need immediate help!
